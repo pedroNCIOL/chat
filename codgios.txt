@@ -1,0 +1,4068 @@
+obj_menu create:"
+/// obj_menu - Create
+
+enum telas {
+    menu,
+    menu_partida_privada,
+    lobby,
+    menu_partida_publica
+}
+
+enum personagem {
+    boneco1,
+    boneco2,
+    boneco3,
+    boneco4
+}
+
+tela_atual = telas.menu;
+
+botoes_menu = ["Partida Privada", "Partida Publica"];
+botoes_funcao = [
+    telas.menu_partida_privada,
+    telas.menu_partida_publica
+];
+
+// --------------------------------------------------
+// PERSONAGENS
+// --------------------------------------------------
+
+// Lista de personagens disponíveis
+personagens = [
+    personagem.boneco1,
+    personagem.boneco2,
+    personagem.boneco3,
+    personagem.boneco4
+];
+
+// Sprites correspondentes aos personagens
+sprites_personagens = [
+    spr_player1,
+    spr_player2,
+    spr_player3,
+    spr_player4
+];
+
+// Personagem selecionado
+personagem_indice = 0;
+personagem_atual = personagens[personagem_indice];
+
+// --------------------------------------------------
+// CORES DOS JOGADORES
+// --------------------------------------------------
+
+cores_jogador = [
+    "red",
+    "blue",
+    "green",
+    "yellow"
+];
+
+cores_draw = [
+    c_red,
+    c_blue,
+    c_green,
+    c_yellow
+];
+
+// Índice da cor selecionada
+cor_indice = 0;
+cor_atual = cores_jogador[cor_indice];
+
+// --------------------------------------------------
+// NOME DO JOGADOR
+// --------------------------------------------------
+
+randomize();
+
+nome_jogador = choose(
+    "prikito",
+    "caneta azul",
+    "inxada",
+    "tira o ja"
+);
+
+// --------------------------------------------------
+// CÓDIGO DA SALA
+// --------------------------------------------------
+
+codigo_sala_privada = "";
+code = "";
+ativo_code = false;
+
+// --------------------------------------------------
+// MENSAGENS DA INTERFACE
+// --------------------------------------------------
+
+menu_mensagem = "";
+menu_erro = "";
+
+// --------------------------------------------------
+// CONTROLE DE CONEXÃO
+// --------------------------------------------------
+
+menu_aguardando = false;
+menu_conexao_anterior = false;
+
+// --------------------------------------------------
+// LISTAGEM PÚBLICA
+// --------------------------------------------------
+
+partidas_existentes = 0;
+partida_selecionada = -1;
+
+// --------------------------------------------------
+// LOBBY
+// --------------------------------------------------
+
+qtd_players = 0;
+"
+obj_menu step:"
+/// obj_menu - Step
+
+var _net = instance_find(obj_network_manager, 0);
+
+// --------------------------------------------------
+// VERIFICAR SE A PARTIDA COMEÇOU
+// --------------------------------------------------
+
+if (_net != noone && _net.net_game_started) {
+
+    _net.net_game_started = false;
+
+    room_goto(rm_jogo);
+    exit;
+}
+
+// --------------------------------------------------
+// VERIFICAR CONEXÃO
+// --------------------------------------------------
+
+if (_net != noone) {
+
+    if (_net.net_connected && !menu_conexao_anterior) {
+
+        menu_conexao_anterior = true;
+        menu_aguardando = false;
+
+        tela_atual = telas.lobby;
+
+        ativo_code = false;
+        menu_erro = "";
+        menu_mensagem = "";
+
+        codigo_sala_privada = _net.net_room_id;
+
+        cor_atual = _net.net_player_color;
+
+        for (var i = 0; i < array_length(cores_jogador); i++) {
+
+            if (cores_jogador[i] == cor_atual) {
+                cor_indice = i;
+                break;
+            }
+        }
+    }
+
+    if (_net.net_error != "") {
+
+        menu_erro = _net.net_error;
+        menu_aguardando = false;
+    }
+
+    partidas_existentes = array_length(_net.net_lobby_rooms);
+
+    if (_net.net_connected) {
+        qtd_players = array_length(_net.net_players);
+    }
+}
+
+// --------------------------------------------------
+// DIGITAÇÃO DOS CÓDIGOS
+// --------------------------------------------------
+
+if (ativo_code) {
+
+    var _allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    var _filtered_code = "";
+
+    for (var i = 1; i <= string_length(keyboard_string); i++) {
+
+        var _char = string_char_at(keyboard_string, i);
+
+        if (string_pos(_char, _allowed) > 0) {
+
+            if (string_length(_filtered_code) < 6) {
+                _filtered_code += _char;
+            }
+        }
+    }
+
+    code = _filtered_code;
+    keyboard_string = code;
+
+    if (keyboard_check_pressed(vk_enter)) {
+
+        ativo_code = false;
+        code = string_trim(code);
+
+        if (string_length(code) != 6) {
+
+            menu_erro = "O código deve ter exatamente 6 caracteres.";
+            menu_mensagem = "";
+
+        }
+        else if (_net == noone) {
+
+            menu_erro = "Gerenciador de rede não encontrado.";
+
+        }
+        else {
+
+            menu_erro = "";
+            menu_mensagem = "Verificando sala...";
+            menu_aguardando = true;
+
+            if (tela_atual == telas.menu_partida_privada) {
+
+                _net.net_join_private(
+                    code,
+                    nome_jogador,
+                    cor_atual,
+                    personagem_indice
+                );
+
+            }
+            else if (tela_atual == telas.menu_partida_publica) {
+
+                _net.net_join_public(
+                    code,
+                    nome_jogador,
+                    cor_atual,
+                    personagem_indice
+                );
+
+            }
+        }
+    }
+
+    if (keyboard_check_pressed(vk_escape)) {
+
+        ativo_code = false;
+        code = "";
+        keyboard_string = "";
+    }
+}
+
+// --------------------------------------------------
+// CLIQUES DO MENU
+// --------------------------------------------------
+
+if (mouse_check_button_pressed(mb_left)) {
+
+    var _room_x = room_width;
+    var _room_y = room_height;
+
+    if (menu_aguardando) {
+        exit;
+    }
+
+    switch (tela_atual) {
+
+        // ==========================================
+        // MENU PRINCIPAL
+        // ==========================================
+
+        case telas.menu:
+
+            // Gerar nome aleatório.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                20, 20, 300, 70
+            )) {
+
+                randomize();
+
+                nome_jogador = choose(
+                    "prikito",
+                    "neymar",
+                    "inxada",
+                    "tira o ja"
+                );
+            }
+
+            // Trocar personagem.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                20, 80, 300, 130
+            )) {
+
+                personagem_indice++;
+
+                if (personagem_indice >= array_length(personagens)) {
+                    personagem_indice = 0;
+                }
+
+                personagem_atual = personagens[personagem_indice];
+            }
+
+            // Selecionar cor.
+            for (var i = 0; i < array_length(cores_jogador); i++) {
+
+                var _color_left = 20 + i * 60;
+                var _color_right = _color_left + 50;
+
+                if (point_in_rectangle(
+                    mouse_x, mouse_y,
+                    _color_left, 145,
+                    _color_right, 195
+                )) {
+
+                    cor_indice = i;
+                    cor_atual = cores_jogador[i];
+
+                    break;
+                }
+            }
+
+            var _b1 = (_room_y / 2) - 100;
+            var _b2 = (_room_y / 2) - 25;
+            var _b3 = (_room_x / 2) - 450;
+
+            for (var i = 0; i < 2; i++) {
+
+                var _left = _b3 + i * 300;
+                var _right = _left + 250;
+
+                if (point_in_rectangle(
+                    mouse_x, mouse_y,
+                    _left, _b1,
+                    _right, _b2
+                )) {
+
+                    tela_atual = botoes_funcao[i];
+
+                    ativo_code = false;
+                    code = "";
+                    keyboard_string = "";
+
+                    menu_erro = "";
+                    menu_mensagem = "";
+                }
+            }
+
+            break;
+
+        // ==========================================
+        // MENU PRIVADO
+        // ==========================================
+
+        case telas.menu_partida_privada:
+
+            // Criar partida privada.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                _room_x / 2 - 200,
+                _room_y / 2 - 240,
+                _room_x / 2 + 200,
+                _room_y / 2 - 130
+            )) {
+
+                if (_net != noone) {
+
+                    menu_erro = "";
+                    menu_mensagem = "Criando partida...";
+                    menu_aguardando = true;
+
+                    _net.net_create_private(
+                        nome_jogador,
+                        cor_atual,
+                        personagem_indice
+                    );
+                }
+            }
+
+            // Ativar campo de código privado.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                _room_x / 2 - 200,
+                _room_y / 2 - 10,
+                _room_x / 2 + 200,
+                _room_y / 2 + 100
+            )) {
+
+                ativo_code = true;
+
+                keyboard_string = code;
+                menu_erro = "";
+                menu_mensagem = "";
+            }
+
+            // Voltar.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                20, 670, 300, 740
+            )) {
+
+                ativo_code = false;
+                code = "";
+                keyboard_string = "";
+
+                tela_atual = telas.menu;
+
+                menu_erro = "";
+                menu_mensagem = "";
+            }
+
+            break;
+
+        // ==========================================
+        // MENU PÚBLICO
+        // ==========================================
+
+        case telas.menu_partida_publica:
+
+            // Voltar.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                20, 670, 300, 740
+            )) {
+
+                ativo_code = false;
+                code = "";
+                keyboard_string = "";
+
+                tela_atual = telas.menu;
+
+                menu_erro = "";
+                menu_mensagem = "";
+
+                break;
+            }
+
+            // Ativar campo de código público.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                _room_x / 2 - 450,
+                _room_y / 2 + 90,
+                _room_x / 2 - 50,
+                _room_y / 2 + 160
+            )) {
+
+                ativo_code = true;
+
+                keyboard_string = code;
+                menu_erro = "";
+                menu_mensagem = "";
+
+                break;
+            }
+
+            // Procurar partida aleatória.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                _room_x / 2 - 100,
+                670,
+                _room_x / 2 + 100,
+                740
+            )) {
+
+                if (_net != noone) {
+
+                    ativo_code = false;
+                    menu_erro = "";
+                    menu_mensagem = "Procurando partida...";
+                    menu_aguardando = true;
+
+                    _net.net_find_public(
+                        nome_jogador,
+                        cor_atual,
+                        personagem_indice
+                    );
+                }
+
+                break;
+            }
+
+            // Entrar em uma partida pública da lista.
+            if (_net != noone) {
+
+                var _visible_index = 0;
+
+                for (var i = 0; i < array_length(_net.net_lobby_rooms); i++) {
+
+                    var _room_info = _net.net_lobby_rooms[i];
+
+                    var _row_top = _room_y / 2 - 90 + (_visible_index * 100);
+                    var _row_bottom = _row_top + 74;
+
+                    if (_visible_index < 4) {
+
+                        if (point_in_rectangle(
+                            mouse_x, mouse_y,
+                            _room_x / 2 + 210,
+                            _row_top,
+                            _room_x - 40,
+                            _row_bottom
+                        )) {
+
+                            menu_erro = "";
+                            menu_mensagem = "Entrando na partida...";
+                            menu_aguardando = true;
+
+                            _net.net_join_public(
+                                _room_info.roomId,
+                                nome_jogador,
+                                cor_atual,
+                                personagem_indice
+                            );
+
+                            break;
+                        }
+                    }
+
+                    _visible_index++;
+                }
+            }
+
+            break;
+
+        // ==========================================
+        // LOBBY
+        // ==========================================
+
+        case telas.lobby:
+
+            // Selecionar uma cor no lobby.
+            if (_net != noone
+            && _net.net_connected
+            && _net.net_game_status == "waiting") {
+
+                for (var i = 0; i < array_length(cores_jogador); i++) {
+
+                    var _color_left = 20 + i * 60;
+                    var _color_right = _color_left + 50;
+
+                    if (point_in_rectangle(
+                        mouse_x, mouse_y,
+                        _color_left, 150,
+                        _color_right, 200
+                    )) {
+
+                        var _requested_color = cores_jogador[i];
+                        var _color_occupied = false;
+
+                        for (var j = 0; j < array_length(_net.net_players); j++) {
+
+                            var _other_player = _net.net_players[j];
+
+                            if (_other_player.session_id != _net.net_session_id) {
+
+                                var _other_color = colyseus_schema_get(
+                                    _other_player.schema,
+                                    "color"
+                                );
+
+                                if (_other_color == _requested_color) {
+                                    _color_occupied = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!_color_occupied) {
+
+                            colyseus_send(
+                                _net.net_room,
+                                "select_color",
+                                {
+                                    color: _requested_color
+                                }
+                            );
+
+                            menu_erro = "";
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            // Sair do lobby.
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                20, 670, 300, 740
+            )) {
+
+                if (_net != noone && _net.net_connected) {
+
+                    if (_net.net_room != 0) {
+
+                        if (colyseus_room_is_connected(_net.net_room)) {
+                            colyseus_room_leave(_net.net_room);
+                        }
+
+                        colyseus_room_free(_net.net_room);
+                    }
+
+                    _net.net_room = 0;
+                    _net.net_callbacks = 0;
+
+                    _net.net_connected = false;
+                    _net.net_busy = false;
+
+                    _net.net_players = [];
+
+                    _net.net_room_id = "";
+                    _net.net_session_id = "";
+                    _net.net_host_session_id = "";
+
+                    _net.net_game_status = "waiting";
+                    _net.net_game_started = false;
+
+                    _net.net_room_mode = "";
+                    _net.net_auto_start_countdown = 0;
+
+                    _net.net_player_color = "red";
+                }
+
+                tela_atual = telas.menu;
+
+                menu_conexao_anterior = false;
+                menu_aguardando = false;
+
+                ativo_code = false;
+                code = "";
+                keyboard_string = "";
+
+                codigo_sala_privada = "";
+
+                qtd_players = 0;
+
+                menu_erro = "";
+                menu_mensagem = "";
+
+                break;
+            }
+
+            // Iniciar partida privada: somente o anfitrião.
+            if (_net != noone
+            && _net.net_connected
+            && _net.net_room_mode == "private"
+            && _net.net_session_id == _net.net_host_session_id
+            && array_length(_net.net_players) >= 2) {
+
+                if (point_in_rectangle(
+                    mouse_x, mouse_y,
+                    _room_x / 2 - 100,
+                    670,
+                    _room_x / 2 + 100,
+                    740
+                )) {
+
+                    colyseus_send(
+                        _net.net_room,
+                        "start",
+                        {}
+                    );
+
+                    menu_mensagem = "Iniciando partida...";
+                }
+            }
+
+            break;
+    }
+}
+"
+obj_menu draw:"
+/// obj_menu - Draw
+
+var _room_x = room_width;
+var _room_y = room_height;
+
+var _b1 = (_room_y / 2) - 100;
+var _b2 = (_room_y / 2) - 25;
+var _b3 = (_room_x / 2) - 450;
+
+// Restaurar os estados de desenho
+draw_set_alpha(1);
+draw_set_color(c_white);
+draw_set_halign(fa_left);
+draw_set_valign(fa_top);
+
+// --------------------------------------------------
+// MENU PRINCIPAL
+// --------------------------------------------------
+
+switch (tela_atual) {
+
+    case telas.menu:
+
+        // Nome do jogador
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            20, 20, 300, 70
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(20, 20, 300, 70, true);
+        draw_text_transformed(30, 35, nome_jogador, 1, 1, 0);
+
+        draw_set_color(c_white);
+
+        // Botão de trocar personagem
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            20, 80, 300, 130
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(20, 80, 300, 130, true);
+
+        // Desenhar sprite do personagem selecionado
+        draw_sprite_ext(
+            sprites_personagens[personagem_indice],
+            0,
+            160,
+            105,
+            1,
+            1,
+            0,
+            c_white,
+            1
+        );
+
+        draw_set_color(c_white);
+
+        // ------------------------------------------
+        // SELEÇÃO DE CORES
+        // ------------------------------------------
+
+        for (var i = 0; i < array_length(cores_jogador); i++) {
+
+            var _color_left = 20 + i * 60;
+            var _color_top = 145;
+            var _color_right = _color_left + 50;
+            var _color_bottom = _color_top + 50;
+
+            // Garantir alpha normal antes de desenhar a cor
+            draw_set_alpha(1);
+            draw_set_color(cores_draw[i]);
+
+            // Quadrado colorido
+            draw_rectangle(
+                _color_left,
+                _color_top,
+                _color_right,
+                _color_bottom,
+                false
+            );
+
+            // Aplicar transparência somente na cor selecionada
+            if (i == cor_indice) {
+
+                draw_set_color(c_black);
+                draw_set_alpha(.8);
+
+                draw_rectangle(
+                    _color_left,
+                    _color_top,
+                    _color_right,
+                    _color_bottom,
+                    false
+                );
+            }
+
+            // Restaurar alpha antes do próximo quadrado
+            draw_set_alpha(1);
+        }
+
+        draw_set_color(c_white);
+
+        // Botões principais
+        for (var i = 0; i < 2; i++) {
+
+            var _left = _b3 + i * 300;
+            var _right = _left + 250;
+
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                _left, _b1,
+                _right, _b2
+            )) {
+                draw_set_color(c_lime);
+            }
+
+            draw_rectangle(
+                _left, _b1,
+                _right, _b2,
+                true
+            );
+
+            draw_set_halign(fa_center);
+
+            draw_text_transformed(
+                _left + 125,
+                _b1 + 25,
+                botoes_menu[i],
+                1, 1, 0
+            );
+
+            draw_set_halign(fa_left);
+            draw_set_color(c_white);
+        }
+
+        break;
+
+
+    // --------------------------------------------------
+    // MENU PRIVADO
+    // --------------------------------------------------
+
+    case telas.menu_partida_privada:
+
+        // Criar partida
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            _room_x / 2 - 200,
+            _room_y / 2 - 240,
+            _room_x / 2 + 200,
+            _room_y / 2 - 130
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(
+            _room_x / 2 - 200,
+            _room_y / 2 - 240,
+            _room_x / 2 + 200,
+            _room_y / 2 - 130,
+            true
+        );
+
+        draw_set_halign(fa_center);
+
+        draw_text_transformed(
+            _room_x / 2,
+            _room_y / 2 - 200,
+            "Criar Partida",
+            2, 2, 0
+        );
+
+        draw_set_color(c_white);
+        draw_set_halign(fa_left);
+
+        // Título do campo
+        draw_set_halign(fa_center);
+
+        draw_text_transformed(
+            _room_x / 2,
+            _room_y / 2 - 80,
+            "Digite o codigo",
+            2, 2, 0
+        );
+
+        draw_set_halign(fa_left);
+
+        // Campo de código
+        if (ativo_code) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(
+            _room_x / 2 - 200,
+            _room_y / 2 - 10,
+            _room_x / 2 + 200,
+            _room_y / 2 + 100,
+            true
+        );
+
+        draw_set_color(c_white);
+
+        if (code == "") {
+
+            draw_set_alpha(0.5);
+
+            draw_text_transformed(
+                _room_x / 2 - 90,
+                _room_y / 2 + 10,
+                "Codigo da sala...",
+                2, 2, 0
+            );
+
+            draw_set_alpha(1);
+        }
+        else {
+
+            draw_text_transformed(
+                _room_x / 2 - 90,
+                _room_y / 2 + 10,
+                code,
+                2, 2, 0
+            );
+        }
+
+        // Voltar
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            20, 670, 300, 740
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(20, 670, 300, 740, true);
+        draw_text_transformed(30, 690, "Voltar", 1, 1, 0);
+
+        draw_set_color(c_white);
+
+        break;
+
+
+    // --------------------------------------------------
+    // MENU PÚBLICO
+    // --------------------------------------------------
+
+    case telas.menu_partida_publica:
+
+        // Voltar
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            20, 670, 300, 740
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(20, 670, 300, 740, true);
+        draw_text_transformed(30, 690, "Voltar", 1, 1, 0);
+
+        draw_set_color(c_white);
+
+        // Procurar partida
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            _room_x / 2 - 100,
+            670,
+            _room_x / 2 + 100,
+            740
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(
+            _room_x / 2 - 100,
+            670,
+            _room_x / 2 + 100,
+            740,
+            true
+        );
+
+        draw_set_halign(fa_center);
+
+        draw_text_transformed(
+            _room_x / 2,
+            690,
+            "Procurar Partida",
+            1, 1, 0
+        );
+
+        draw_set_halign(fa_left);
+        draw_set_color(c_white);
+
+        // ------------------------------------------
+        // ENTRAR POR CÓDIGO DE PARTIDA PÚBLICA
+        // ------------------------------------------
+
+        draw_set_halign(fa_center);
+
+        draw_text_transformed(
+            _room_x / 2 - 250,
+            _room_y / 2 + 45,
+            "Entrar por codigo",
+            1, 1, 0
+        );
+
+        draw_set_halign(fa_left);
+
+        if (ativo_code) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(
+            _room_x / 2 - 450,
+            _room_y / 2 + 90,
+            _room_x / 2 - 50,
+            _room_y / 2 + 160,
+            true
+        );
+
+        draw_set_color(c_white);
+
+        if (code == "") {
+
+            draw_set_alpha(0.5);
+
+            draw_text_transformed(
+                _room_x / 2 - 430,
+                _room_y / 2 + 110,
+                "Codigo da sala...",
+                1, 1, 0
+            );
+
+            draw_set_alpha(1);
+        }
+        else {
+
+            draw_text_transformed(
+                _room_x / 2 - 430,
+                _room_y / 2 + 110,
+                code,
+                1, 1, 0
+            );
+        }
+
+        // ------------------------------------------
+        // LISTA DE PARTIDAS
+        // ------------------------------------------
+
+        draw_set_halign(fa_center);
+
+        draw_text_transformed(
+            _room_x / 2 + 400,
+            _room_y / 2 - 130,
+            "Partidas Encontradas",
+            1, 1, 0
+        );
+
+        draw_set_halign(fa_left);
+
+        draw_rectangle(
+            _room_x / 2 + 200,
+            _room_y / 2 - 100,
+            _room_x - 30,
+            _room_y - 100,
+            true
+        );
+
+        var _net = instance_find(obj_network_manager, 0);
+
+        if (_net != noone) {
+
+            var _room_count = array_length(_net.net_lobby_rooms);
+            var _visible_count = min(_room_count, 4);
+
+            for (var i = 0; i < _visible_count; i++) {
+
+                var _room_info = _net.net_lobby_rooms[i];
+
+                var _row_top = _room_y / 2 - 90 + i * 100;
+                var _row_bottom = _row_top + 74;
+
+                if (point_in_rectangle(
+                    mouse_x, mouse_y,
+                    _room_x / 2 + 210,
+                    _row_top,
+                    _room_x - 40,
+                    _row_bottom
+                )) {
+                    draw_set_color(c_lime);
+                }
+
+                draw_rectangle(
+                    _room_x / 2 + 210,
+                    _row_top,
+                    _room_x - 40,
+                    _row_bottom,
+                    true
+                );
+
+                draw_set_color(c_white);
+
+                draw_text_transformed(
+                    _room_x / 2 + 225,
+                    _row_top + 8,
+                    "Sala: " + _room_info.roomId,
+                    1, 1, 0
+                );
+
+                draw_text_transformed(
+                    _room_x / 2 + 225,
+                    _row_top + 40,
+                    string(_room_info.clients) + " / " +
+                    string(_room_info.maxClients) + " jogadores",
+                    1, 1, 0
+                );
+
+                for (var j = 0; j < 4; j++) {
+
+                    var _has_player = j < _room_info.clients;
+
+                    draw_sprite_ext(
+                        spr_players_icon,
+                        _has_player,
+                        _room_x - 150 + j * 25,
+                        _row_top + 25,
+                        2, 2, 0,
+                        c_white, 1
+                    );
+                }
+            }
+
+            if (_room_count == 0) {
+
+                draw_set_halign(fa_center);
+
+                draw_text_transformed(
+                    _room_x / 2 + 400,
+                    _room_y / 2 + 50,
+                    "Nenhuma partida encontrada",
+                    1, 1, 0
+                );
+
+                draw_set_halign(fa_left);
+            }
+        }
+
+        break;
+
+
+    // --------------------------------------------------
+    // LOBBY
+    // --------------------------------------------------
+
+    case telas.lobby:
+
+        var _net = instance_find(obj_network_manager, 0);
+
+        draw_set_halign(fa_center);
+
+        draw_text_transformed(
+            _room_x / 2,
+            _room_y / 2 - 150,
+            "Lobby",
+            2, 2, 0
+        );
+
+        draw_text_transformed(
+            _room_x / 2,
+            _room_y / 2 - 100,
+            "Codigo da sala: " + codigo_sala_privada,
+            1, 1, 0
+        );
+
+        draw_text_transformed(
+            _room_x / 2,
+            _room_y / 2 - 60,
+            "Jogadores: " + string(qtd_players) + " / 4",
+            1, 1, 0
+        );
+
+        draw_set_halign(fa_left);
+
+        // ------------------------------------------
+        // SELEÇÃO DE CORES DO LOBBY
+        // ------------------------------------------
+
+        draw_text_transformed(
+            20,
+            125,
+            "Escolha sua cor:",
+            1, 1, 0
+        );
+
+        for (var i = 0; i < array_length(cores_jogador); i++) {
+
+            var _color_left = 20 + i * 60;
+            var _color_top = 150;
+            var _color_right = _color_left + 50;
+            var _color_bottom = _color_top + 50;
+
+            var _color_occupied = false;
+
+            // Verificar se algum jogador está usando essa cor
+            if (_net != noone) {
+
+                for (var j = 0; j < array_length(_net.net_players); j++) {
+
+                    var _player_color = colyseus_schema_get(
+                        _net.net_players[j].schema,
+                        "color"
+                    );
+
+                    if (_player_color == cores_jogador[i]) {
+                        _color_occupied = true;
+                        break;
+                    }
+                }
+            }
+
+            // Desenhar quadrado colorido
+            draw_set_alpha(1);
+            draw_set_color(cores_draw[i]);
+
+            draw_rectangle(
+                _color_left,
+                _color_top,
+                _color_right,
+                _color_bottom,
+                false
+            );
+
+            // Escurecer cores ocupadas
+            if (_color_occupied) {
+
+                draw_set_color(c_black);
+                draw_set_alpha(0.8);
+
+                draw_rectangle(
+                    _color_left,
+                    _color_top,
+                    _color_right,
+                    _color_bottom,
+                    false
+                );
+            }
+
+            draw_set_alpha(1);
+        }
+
+        draw_set_color(c_white);
+
+        // ------------------------------------------
+        // CAIXAS DOS JOGADORES
+        // ------------------------------------------
+
+        var _player_x = -250;
+
+        for (var i = 0; i < 4; i++) {
+
+            var _box_left = _room_x / 2 + _player_x + i * 140;
+            var _box_right = _box_left + 100;
+
+            draw_rectangle(
+                _box_left,
+                _room_y / 2,
+                _box_right,
+                _room_y / 2 + 200,
+                true
+            );
+
+            var _player_name = "Aguardando...";
+
+            var _has_player = false;
+            var _box_player_color = "";
+
+            if (_net != noone) {
+
+                if (i < array_length(_net.net_players)) {
+
+                    _has_player = true;
+
+                    _player_name = _net.net_players[i].name;
+
+                    _box_player_color = colyseus_schema_get(
+                        _net.net_players[i].schema,
+                        "color"
+                    );
+                }
+            }
+
+            // Desenhar a faixa somente se existir jogador
+            if (_has_player) {
+
+                var _box_color = c_red;
+
+                switch (_box_player_color) {
+
+                    case "red":
+                        _box_color = c_red;
+                        break;
+
+                    case "blue":
+                        _box_color = c_blue;
+                        break;
+
+                    case "green":
+                        _box_color = c_green;
+                        break;
+
+                    case "yellow":
+                        _box_color = c_yellow;
+                        break;
+                }
+
+                draw_set_alpha(1);
+                draw_set_color(_box_color);
+
+                draw_rectangle(
+                    _box_left,
+                    _room_y / 2,
+                    _box_right,
+                    _room_y / 2 + 12,
+                    false
+                );
+            }
+
+            draw_set_alpha(1);
+            draw_set_color(c_white);
+
+            draw_set_halign(fa_center);
+
+            draw_text_transformed(
+                _box_left + 50,
+                _room_y / 2 + 75,
+                _player_name,
+                1, 1, 0
+            );
+
+            draw_set_halign(fa_left);
+        }
+
+        // ------------------------------------------
+        // CONTAGEM AUTOMÁTICA DAS PARTIDAS PÚBLICAS
+        // ------------------------------------------
+
+        if (_net != noone
+        && _net.net_connected
+        && _net.net_room_mode == "public") {
+
+            draw_set_halign(fa_center);
+
+            if (_net.net_auto_start_countdown > 0) {
+
+                draw_text_transformed(
+                    _room_x / 2,
+                    620,
+                    "Partida iniciando em: " +
+                    string(_net.net_auto_start_countdown) + "s",
+                    1.5, 1.5, 0
+                );
+
+            }
+            else if (array_length(_net.net_players) < 2) {
+
+                draw_text_transformed(
+                    _room_x / 2,
+                    620,
+                    "Aguardando mais jogadores...",
+                    1.5, 1.5, 0
+                );
+            }
+
+            draw_set_halign(fa_left);
+        }
+
+        // ------------------------------------------
+        // BOTÃO SAIR DO LOBBY
+        // ------------------------------------------
+
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            20, 670, 300, 740
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(20, 670, 300, 740, true);
+
+        draw_set_halign(fa_center);
+
+        draw_text_transformed(
+            160,
+            690,
+            "Sair do lobby",
+            1, 1, 0
+        );
+
+        draw_set_halign(fa_left);
+        draw_set_color(c_white);
+
+        // ------------------------------------------
+        // BOTÃO INICIAR PARTIDA
+        // SOMENTE PARA PARTIDAS PRIVADAS
+        // ------------------------------------------
+
+        if (_net != noone
+        && _net.net_connected
+        && _net.net_room_mode == "private"
+        && _net.net_session_id == _net.net_host_session_id
+        && array_length(_net.net_players) >= 2) {
+
+            if (point_in_rectangle(
+                mouse_x, mouse_y,
+                _room_x / 2 - 100,
+                670,
+                _room_x / 2 + 100,
+                740
+            )) {
+                draw_set_color(c_lime);
+            }
+
+            draw_rectangle(
+                _room_x / 2 - 100,
+                670,
+                _room_x / 2 + 100,
+                740,
+                true
+            );
+
+            draw_set_halign(fa_center);
+
+            draw_text_transformed(
+                _room_x / 2,
+                690,
+                "Iniciar partida",
+                1, 1, 0
+            );
+
+            draw_set_halign(fa_left);
+            draw_set_color(c_white);
+        }
+
+        break;
+}
+
+// --------------------------------------------------
+// MENSAGENS
+// --------------------------------------------------
+
+draw_set_alpha(1);
+draw_set_color(c_white);
+
+if (menu_mensagem != "") {
+
+    draw_set_halign(fa_center);
+
+    draw_text_transformed(
+        _room_x / 2,
+        _room_y - 45,
+        menu_mensagem,
+        1, 1, 0
+    );
+}
+
+if (menu_erro != "") {
+
+    draw_set_color(c_red);
+    draw_set_halign(fa_center);
+
+    draw_text_transformed(
+        _room_x / 2,
+        _room_y - 75,
+        menu_erro,
+        1, 1, 0
+    );
+}
+
+draw_set_alpha(1);
+draw_set_color(c_white);
+draw_set_halign(fa_left);
+"
+obj_network_manager create:"
+/// obj_network_manager - Create
+
+net_players = [];
+net_callbacks = 0;
+
+persistent = true;
+
+// Estado da conexão
+net_connected = false;
+net_busy = false;
+net_status = "Conectando ao servidor...";
+net_error = "";
+
+// Estado da partida
+net_host_session_id = "";
+net_game_status = "waiting";
+net_game_started = false;
+
+// Modalidade da sala
+net_room_mode = "";
+
+// Contagem automática das partidas públicas
+net_auto_start_countdown = 0;
+
+// Dados do tabuleiro recebidos do servidor
+net_board_data = [];
+net_board_data_received = false;
+net_board_data_version = 0;
+
+// Cores
+net_selected_color = "red";
+net_player_color = "red";
+
+//net_client = colyseus_client_create("http://localhost:2567");
+net_client = colyseus_client_create("http://26.3.118.45:2567");
+
+net_room = 0;
+net_lobby_room = 0;
+
+net_room_id = "";
+net_session_id = "";
+
+net_lobby_rooms = [];
+
+
+// --------------------------------------------------
+// REGISTRAR UMA SALA DE JOGO
+// --------------------------------------------------
+
+net_register_room = function(_room) {
+
+    net_room = _room;
+    net_busy = true;
+    net_connected = false;
+
+    net_host_session_id = "";
+    net_game_status = "waiting";
+    net_game_started = false;
+    net_auto_start_countdown = 0;
+
+    // Reiniciar dados do tabuleiro ao entrar em outra sala.
+    net_board_data = [];
+    net_board_data_received = false;
+    net_board_data_version = 0;
+
+    colyseus_on_join(_room, function(_joined_room) {
+
+        net_connected = true;
+        net_busy = false;
+        net_status = "Conectado!";
+        net_error = "";
+
+        net_room_id = colyseus_room_get_id(_joined_room);
+        net_session_id = colyseus_room_get_session_id(_joined_room);
+
+        net_players = [];
+
+        net_callbacks = colyseus_callbacks_create(_joined_room);
+
+        var _state = colyseus_room_get_state(_joined_room);
+
+        if (_state != undefined) {
+
+            var _host_id = colyseus_schema_get(
+                _state,
+                "hostSessionId"
+            );
+
+            if (is_undefined(_host_id)) {
+                net_host_session_id = "";
+            }
+            else {
+                net_host_session_id = _host_id;
+            }
+
+            net_game_status = colyseus_schema_get(
+                _state,
+                "status"
+            );
+
+            net_game_started = (net_game_status == "playing");
+
+            var _countdown = colyseus_schema_get(
+                _state,
+                "autoStartCountdown"
+            );
+
+            if (is_undefined(_countdown)) {
+                net_auto_start_countdown = 0;
+            }
+            else {
+                net_auto_start_countdown = _countdown;
+            }
+        }
+
+        colyseus_listen(
+            net_callbacks,
+            "hostSessionId",
+            function(_value, _previous) {
+
+                if (is_undefined(_value)) {
+                    net_host_session_id = "";
+                }
+                else {
+                    net_host_session_id = _value;
+                }
+            }
+        );
+
+        colyseus_listen(
+            net_callbacks,
+            "status",
+            function(_value, _previous) {
+
+                net_game_status = _value;
+
+                if (_value == "playing") {
+                    net_game_started = true;
+                }
+            }
+        );
+
+        colyseus_listen(
+            net_callbacks,
+            "autoStartCountdown",
+            function(_value, _previous) {
+
+                if (is_undefined(_value)) {
+                    net_auto_start_countdown = 0;
+                }
+                else {
+                    net_auto_start_countdown = _value;
+                }
+            }
+        );
+
+        // Observar jogadores adicionados.
+        colyseus_on_add(
+            net_callbacks,
+            "players",
+            function(_instance, _key) {
+
+                var _player_name = colyseus_schema_get(
+                    _instance,
+                    "name"
+                );
+
+                var _player_color = colyseus_schema_get(
+                    _instance,
+                    "color"
+                );
+
+                if (is_undefined(_player_color) || _player_color == "") {
+                    _player_color = "red";
+                }
+
+                var _player_data = {
+                    session_id: _key,
+                    name: _player_name,
+                    color: _player_color,
+                    schema: _instance
+                };
+
+                net_players[array_length(net_players)] = _player_data;
+
+                if (_key == net_session_id) {
+                    net_player_color = _player_color;
+                }
+
+                show_debug_message(
+                    "PLAYER ADICIONADO | ID: " + string(_key) +
+                    " | NOME: " + string(_player_name) +
+                    " | COR: " + string(_player_color)
+                );
+
+                show_debug_message(
+                    "TOTAL APOS ADICAO: " +
+                    string(array_length(net_players))
+                );
+            }
+        );
+
+        // Observar jogadores removidos.
+        colyseus_on_remove(
+            net_callbacks,
+            "players",
+            function(_instance, _key) {
+
+                show_debug_message("=== ANTES DA REMOCAO ===");
+
+                show_debug_message(
+                    "ID REMOVIDO: " + string(_key)
+                );
+
+                show_debug_message(
+                    "TOTAL ANTES: " +
+                    string(array_length(net_players))
+                );
+
+                for (var i = 0; i < array_length(net_players); i++) {
+
+                    show_debug_message(
+                        "JOGADOR " + string(i) +
+                        " | ID: " + string(net_players[i].session_id) +
+                        " | NOME: " + string(net_players[i].name)
+                    );
+                }
+
+                var _remaining_players = [];
+
+                for (var j = 0; j < array_length(net_players); j++) {
+
+                    if (net_players[j].session_id != _key) {
+
+                        _remaining_players[
+                            array_length(_remaining_players)
+                        ] = net_players[j];
+                    }
+                }
+
+                net_players = _remaining_players;
+
+                show_debug_message(
+                    "PLAYER REMOVIDO | ID: " + string(_key)
+                );
+
+                show_debug_message("=== JOGADORES RESTANTES ===");
+
+                for (var k = 0; k < array_length(net_players); k++) {
+
+                    show_debug_message(
+                        string(net_players[k].session_id) + " | " +
+                        string(net_players[k].name)
+                    );
+                }
+
+                show_debug_message(
+                    "TOTAL: " + string(array_length(net_players))
+                );
+
+                show_debug_message("===========================");
+            }
+        );
+
+        // Receber mensagens do servidor.
+        colyseus_on_message(
+            _joined_room,
+            function(_room_message, _type, _data) {
+
+                // ------------------------------------------
+                // ERRO DE COR
+                // ------------------------------------------
+
+                if (_type == "color_error") {
+
+                    net_error = string(_data);
+                }
+
+                // ------------------------------------------
+                // DADOS DO TABULEIRO
+                // ------------------------------------------
+
+                else if (_type == "board_data") {
+
+                    var _parsed_data = undefined;
+
+                    // O servidor envia os dados como JSON string.
+                    if (is_string(_data)) {
+
+                        _parsed_data = json_parse(_data);
+                    }
+                    else {
+
+                        _parsed_data = _data;
+                    }
+
+                    if (is_array(_parsed_data)) {
+
+                        net_board_data = _parsed_data;
+                        net_board_data_received = true;
+
+                        // Registrar nova versão do tabuleiro.
+                        net_board_data_version++;
+
+                        show_debug_message(
+                            "DADOS DO TABULEIRO RECEBIDOS | VERSÃO: " +
+                            string(net_board_data_version)
+                        );
+
+                        show_debug_message(
+                            "QUANTIDADE DE CASAS: " +
+                            string(array_length(net_board_data))
+                        );
+
+                    }
+                    else {
+
+                        show_debug_message(
+                            "ERRO AO CONVERTER board_data. Tipo recebido: " +
+                            typeof(_data)
+                        );
+                    }
+                }
+            }
+        );
+
+        show_debug_message("=== SALA CONECTADA ===");
+        show_debug_message("Sala: " + net_room_id);
+        show_debug_message("Sessão: " + net_session_id);
+        show_debug_message("Líder: " + string(net_host_session_id));
+        show_debug_message("Modalidade: " + net_room_mode);
+    });
+
+    colyseus_on_error(_room, function(_code, _message) {
+
+        net_connected = false;
+        net_busy = false;
+        net_status = "Erro ao entrar na sala";
+        net_error = _message;
+
+        show_debug_message("ERRO COLYSEUS [" + string(_code) + "]");
+        show_debug_message(_message);
+    });
+};
+
+
+// --------------------------------------------------
+// CRIAR PARTIDA PRIVADA
+// --------------------------------------------------
+
+net_create_private = function(_player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    net_room_mode = "private";
+    net_selected_color = _player_color;
+
+    var _options = {
+        mode: "private",
+        playerName: _player_name,
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Criando partida privada...";
+    net_error = "";
+
+    var _new_room = colyseus_client_create_room(
+        net_client,
+        "my_room",
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+// --------------------------------------------------
+// ENTRAR EM PARTIDA PRIVADA PELO CÓDIGO
+// --------------------------------------------------
+
+net_join_private = function(_room_id, _player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    if (string_length(string_trim(_room_id)) != 6) {
+        net_error = "O código deve ter 6 caracteres.";
+        return;
+    }
+
+    net_room_mode = "private";
+    net_selected_color = _player_color;
+
+    var _options = {
+        playerName: _player_name,
+        mode: "private",
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Verificando sala privada...";
+    net_error = "";
+
+    var _new_room = colyseus_client_join_by_id(
+        net_client,
+        string_trim(_room_id),
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+// --------------------------------------------------
+// PROCURAR PARTIDA PÚBLICA ALEATÓRIA
+// --------------------------------------------------
+
+net_find_public = function(_player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    net_room_mode = "public";
+    net_selected_color = _player_color;
+
+    var _options = {
+        mode: "public",
+        playerName: _player_name,
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Procurando partida...";
+    net_error = "";
+
+    var _new_room = colyseus_client_join_or_create(
+        net_client,
+        "my_room",
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+// --------------------------------------------------
+// ENTRAR EM UMA PARTIDA PÚBLICA ESPECÍFICA
+// --------------------------------------------------
+
+net_join_public = function(_room_id, _player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    if (string_length(string_trim(_room_id)) != 6) {
+        net_error = "O código deve ter 6 caracteres.";
+        return;
+    }
+
+    net_room_mode = "public";
+    net_selected_color = _player_color;
+
+    var _options = {
+        playerName: _player_name,
+        mode: "public",
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Verificando sala pública...";
+    net_error = "";
+
+    var _new_room = colyseus_client_join_by_id(
+        net_client,
+        string_trim(_room_id),
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+// --------------------------------------------------
+// CONECTAR AO DIRETÓRIO DE PARTIDAS COLYSEUS
+// --------------------------------------------------
+
+net_connect_lobby = function() {
+
+    net_lobby_rooms = [];
+
+    net_lobby_room = colyseus_client_join_or_create(
+        net_client,
+        "lobby",
+        "{}"
+    );
+
+    colyseus_on_join(net_lobby_room, function(_room) {
+
+        show_debug_message("=== DIRETORIO CONECTADO ===");
+    });
+
+    colyseus_on_error(net_lobby_room, function(_code, _message) {
+
+        show_debug_message(
+            "ERRO NO DIRETORIO [" +
+            string(_code) + "]: " + _message
+        );
+    });
+
+    colyseus_on_message(
+        net_lobby_room,
+        function(_room, _type, _data) {
+
+            if (_type == "rooms_begin") {
+
+                net_lobby_rooms = [];
+            }
+            else if (_type == "public_room") {
+
+                if (is_struct(_data)) {
+
+                    var _found = false;
+
+                    for (var i = 0; i < array_length(net_lobby_rooms); i++) {
+
+                        if (net_lobby_rooms[i].roomId == _data.roomId) {
+
+                            net_lobby_rooms[i] = _data;
+                            _found = true;
+                            break;
+                        }
+                    }
+
+                    if (!_found) {
+
+                        net_lobby_rooms[
+                            array_length(net_lobby_rooms)
+                        ] = _data;
+                    }
+
+                    show_debug_message(
+                        "PARTIDA RECEBIDA: " + _data.roomId
+                    );
+
+                } else {
+
+                    show_debug_message(
+                        "ERRO: Dados da partida não são um struct."
+                    );
+                }
+            }
+            else if (_type == "rooms_end") {
+
+                show_debug_message(
+                    "TOTAL DE PARTIDAS: " +
+                    string(array_length(net_lobby_rooms))
+                );
+            }
+        }
+    );
+};
+
+
+// --------------------------------------------------
+// INICIAR A LISTAGEM PÚBLICA
+// --------------------------------------------------
+
+net_connect_lobby();
+"
+obj_network_manager clean up:"/// obj_network_manager - Clean Up
+
+if (net_room != 0) {
+    colyseus_room_leave(net_room);
+    colyseus_room_free(net_room);
+}
+
+if (net_lobby_room != 0) {
+    colyseus_room_leave(net_lobby_room);
+    colyseus_room_free(net_lobby_room);
+}
+
+if (net_client != 0) {
+    colyseus_client_free(net_client);
+}"
+obj_network_manager step:"/// obj_network_manager - Step
+
+// Processar eventos e atualizações do Colyseus.
+colyseus_process();"
+myroom:"
+import { Room, Client, CloseCode, Delayed, ServerError } from "colyseus";
+import { MyRoomState, Player } from "./schema/MyRoomState.js";
+
+const TURN_DURATION = 15_000;
+const BOARD_SIZE = 32;
+const AUTO_START_DURATION = 10;
+const GAME_START_DELAY = 3_000;
+const FIRST_PLAYER_MESSAGE_DURATION = 4_000;
+const EXTRA_ROLL_MESSAGE_DURATION = 3_000;
+const PRISON_MESSAGE_DURATION = 3_000;
+
+const INITIAL_PLAYER_MONEY = 2_000_000;
+const START_CELL_MONEY_REWARD = 300_000;
+const PRISON_ESCAPE_COST = 200_000;
+const MAX_PRISON_ATTEMPTS = 3;
+const PRISON_ATTEMPT_RESULT_DURATION = 2_000;
+
+type PlayerColor = "red" | "blue" | "green" | "yellow";
+type ExtraRollReason = "start" | "doubles";
+
+type CellType =
+    | "start"
+    | "city"
+    | "chance"
+    | "special"
+    | "tax"
+    | "world_tour"
+    | "island";
+
+type BoardCell = {
+    name: string;
+    type: CellType;
+    spriteIndex: number;
+};
+
+const BOARD: BoardCell[] = [
+    { name: "Início", type: "start", spriteIndex: 0 },
+    { name: "Granada", type: "city", spriteIndex: 1 },
+    { name: "Sevilha", type: "city", spriteIndex: 1 },
+    { name: "Madri", type: "city", spriteIndex: 1 },
+    { name: "Bali", type: "city", spriteIndex: 2 },
+    { name: "Hong Kong", type: "city", spriteIndex: 3 },
+    { name: "Pequim", type: "city", spriteIndex: 3 },
+    { name: "Kansai", type: "city", spriteIndex: 3 },
+    { name: "Prisão", type: "island", spriteIndex: 4 },
+    { name: "Veneza", type: "city", spriteIndex: 5 },
+    { name: "Milão", type: "city", spriteIndex: 5 },
+    { name: "Roma", type: "city", spriteIndex: 5 },
+    { name: "Sorte", type: "chance", spriteIndex: 6 },
+    { name: "Hamburgo", type: "city", spriteIndex: 7 },
+    { name: "Chipre", type: "city", spriteIndex: 8 },
+    { name: "Berlim", type: "city", spriteIndex: 9 },
+    { name: "Copa do Mundo", type: "special", spriteIndex: 10 },
+    { name: "Londres", type: "city", spriteIndex: 11 },
+    { name: "Rio de Janeiro", type: "city", spriteIndex: 12 },
+    { name: "Sydney", type: "city", spriteIndex: 13 },
+    { name: "Sorte", type: "chance", spriteIndex: 14 },
+    { name: "Chicago", type: "city", spriteIndex: 15 },
+    { name: "Las Vegas", type: "city", spriteIndex: 15 },
+    { name: "Nova Iorque", type: "city", spriteIndex: 15 },
+    { name: "Volta ao Mundo", type: "world_tour", spriteIndex: 16 },
+    { name: "Egito", type: "city", spriteIndex: 17 },
+    { name: "Lion", type: "city", spriteIndex: 18 },
+    { name: "Paris", type: "city", spriteIndex: 18 },
+    { name: "Sorte", type: "chance", spriteIndex: 19 },
+    { name: "São Paulo", type: "city", spriteIndex: 20 },
+    { name: "Impostos", type: "tax", spriteIndex: 21 },
+    { name: "Dubai", type: "city", spriteIndex: 20 }
+];
+
+export class MyRoom extends Room<{ state: MyRoomState }> {
+    maxClients = 4;
+    state = new MyRoomState();
+
+    private board: BoardCell[] = BOARD.map(cell => ({ ...cell }));
+
+    private turnTimeout?: Delayed;
+    private autoStartInterval?: Delayed;
+    private startDelay?: Delayed;
+    private firstPlayerMessageDelay?: Delayed;
+    private extraRollMessageDelay?: Delayed;
+    private prisonMessageDelay?: Delayed;
+    private prisonAttemptDelay?: Delayed;
+
+    private mode: "public" | "private" = "public";
+
+    private playerJoinOrder: string[] = [];
+
+    // --------------------------------------------------
+    // AGUARDAR A CHEGADA VISUAL DOS JOGADORES
+    // --------------------------------------------------
+
+    private pendingMovementAnnouncement?: {
+        sessionId: string;
+        type: "prison" | "extra" | "none";
+        reason?: ExtraRollReason;
+        arrivedClients: Set<string>;
+    };
+
+    private readonly PLAYER_COLORS: PlayerColor[] = [
+        "red",
+        "blue",
+        "green",
+        "yellow"
+    ];
+
+    private readonly CODE_CHARACTERS =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    private readonly CODE_CHANNEL = "$money_town_room_codes";
+
+    // --------------------------------------------------
+    // ALEATORIZAR POSIÇÃO DAS CIDADES ESPECIAIS
+    // --------------------------------------------------
+
+    private randomizeSpecialCities() {
+        const specialGroups = [
+            { name: "Bali", positions: [3, 4, 5] },
+            { name: "Chipre", positions: [13, 14, 15] },
+            { name: "Rio de Janeiro", positions: [17, 18, 19] },
+            { name: "Egito", positions: [25, 26, 27] }
+        ];
+
+        console.log("==================================");
+        console.log("SORTEANDO POSIÇÕES DAS CIDADES ESPECIAIS");
+
+        for (const group of specialGroups) {
+            const currentIndex = this.board.findIndex(
+                cell => cell.name === group.name
+            );
+
+            if (currentIndex === -1) {
+                console.log(
+                    `ERRO: cidade especial ${group.name} não encontrada.`
+                );
+                continue;
+            }
+
+            const randomIndex = Math.floor(
+                Math.random() * group.positions.length
+            );
+
+            const targetPosition = group.positions[randomIndex];
+
+            const previousCell = this.board[targetPosition];
+            const specialCell = this.board[currentIndex];
+
+            this.board[currentIndex] = previousCell;
+            this.board[targetPosition] = specialCell;
+
+            console.log(
+                `${group.name}: posição ${currentIndex} -> ${targetPosition}`
+            );
+
+            console.log(
+                `Casa deslocada: ${previousCell.name} (${targetPosition} -> ${currentIndex})`
+            );
+        }
+
+        console.log("==================================");
+        console.log("TABULEIRO FINAL:");
+
+        this.board.forEach((cell, index) => {
+            console.log(
+                `Posição ${index}: ${cell.name} | Sprite: ${cell.spriteIndex}`
+            );
+        });
+
+        console.log("==================================");
+    }
+
+    // --------------------------------------------------
+    // ENVIAR TABULEIRO ATUALIZADO PARA TODOS OS JOGADORES
+    // --------------------------------------------------
+
+    private broadcastBoard() {
+        const boardData = this.board.map((cell, index) => ({
+            position: index,
+            name: cell.name,
+            type: cell.type,
+            spriteIndex: cell.spriteIndex
+        }));
+
+        this.broadcast("board_data", JSON.stringify(boardData));
+
+        console.log(
+            `Tabuleiro atualizado enviado para todos os jogadores: ${boardData.length} casas.`
+        );
+    }
+
+    // --------------------------------------------------
+    // AGENDAR ANÚNCIO APÓS A CHEGADA VISUAL
+    // --------------------------------------------------
+
+    private queueMovementAnnouncement(
+        sessionId: string,
+        type: "prison" | "extra" | "none",
+        reason?: ExtraRollReason
+    ) {
+        this.pendingMovementAnnouncement = {
+            sessionId,
+            type,
+            reason,
+            arrivedClients: new Set<string>()
+        };
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.state.turnDeadline = 0;
+        this.state.movementAnnouncementPending = true;
+
+        console.log(
+            `Aguardando todos os jogadores confirmarem a chegada de ${sessionId} antes de liberar a próxima etapa.`
+        );
+    }
+
+    // --------------------------------------------------
+    // VERIFICAR SE TODOS OS CLIENTES CHEGARAM
+    // --------------------------------------------------
+
+    private finishMovementAnnouncementIfReady(
+        departedSessionId?: string
+    ) {
+        const pending = this.pendingMovementAnnouncement;
+
+        if (!pending) {
+            return;
+        }
+
+        const connectedSessionIds = this.clients
+            .map(client => client.sessionId)
+            .filter(sessionId => sessionId !== departedSessionId);
+
+        const everyoneArrived = connectedSessionIds.every(
+            sessionId => pending.arrivedClients.has(sessionId)
+        );
+
+        if (!everyoneArrived) {
+            return;
+        }
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        if (!this.state.players.has(pending.sessionId)) {
+            return;
+        }
+
+        console.log(
+            `Todos os jogadores confirmaram a chegada de ${pending.sessionId}.`
+        );
+
+        if (pending.type === "prison") {
+            this.showPrisonAnnouncement(pending.sessionId);
+        }
+        else if (pending.type === "extra" && pending.reason) {
+            this.showExtraRollAnnouncement(
+                pending.sessionId,
+                pending.reason
+            );
+        }
+    }
+
+    // --------------------------------------------------
+    // VERIFICAR SE EXISTE ALGUM POPUP ATIVO
+    // --------------------------------------------------
+
+    private isPopupActive(): boolean {
+        return (
+            this.state.movementAnnouncementPending ||
+            this.state.showFirstPlayerMessage ||
+            this.state.showExtraRollMessage ||
+            this.state.showPrisonMessage
+        );
+    }
+
+    // --------------------------------------------------
+    // INICIAR OU REINICIAR O TEMPO DO TURNO ATUAL
+    // --------------------------------------------------
+
+    private startCurrentTurnTimer(sessionId: string) {
+        this.turnTimeout?.clear();
+
+        this.state.turnDeadline =
+            this.clock.currentTime + TURN_DURATION;
+
+        this.turnTimeout = this.clock.setTimeout(() => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.state.currentTurn !== sessionId) {
+                return;
+            }
+
+            const currentPlayer = this.state.players.get(sessionId);
+
+            if (!currentPlayer) {
+                return;
+            }
+
+            if (!this.state.hasRolled) {
+                console.log(
+                    `Tempo esgotado! Jogador ${sessionId} perdeu a vez.`
+                );
+
+                this.nextTurn();
+            }
+        }, TURN_DURATION);
+    }
+
+    // --------------------------------------------------
+    // LIBERAR JOGADOR DA PRISÃO E PERMITIR UMA ROLAGEM NORMAL
+    // --------------------------------------------------
+
+    private releasePlayerFromPrison(sessionId: string) {
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            return;
+        }
+
+        this.prisonAttemptDelay?.clear();
+        this.prisonAttemptDelay = undefined;
+
+        player.inPrison = false;
+        player.prisonAttempts = 0;
+
+        player.extraRollAvailable = false;
+
+        this.state.dice1 = 0;
+        this.state.dice2 = 0;
+
+        this.state.lastRollBy = "";
+
+        this.state.hasRolled = false;
+        this.state.hasMoved = false;
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.startCurrentTurnTimer(sessionId);
+
+        console.log("==================================");
+        console.log("JOGADOR LIBERADO DA PRISÃO!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log("ROLAGEM NORMAL LIBERADA.");
+        console.log("==================================");
+    }
+
+    // --------------------------------------------------
+    // VERIFICAR SE UMA COR É VÁLIDA
+    // --------------------------------------------------
+
+    private isValidColor(color: string): color is PlayerColor {
+        return this.PLAYER_COLORS.includes(color as PlayerColor);
+    }
+
+    // --------------------------------------------------
+    // ATRIBUIR COR AO JOGADOR
+    // --------------------------------------------------
+
+    private assignPlayerColor(preferredColor: string): PlayerColor {
+        const occupiedColors = new Set<string>();
+
+        this.state.players.forEach((existingPlayer) => {
+            occupiedColors.add(existingPlayer.color);
+        });
+
+        if (
+            this.isValidColor(preferredColor) &&
+            !occupiedColors.has(preferredColor)
+        ) {
+            return preferredColor;
+        }
+
+        for (const color of this.PLAYER_COLORS) {
+            if (!occupiedColors.has(color)) {
+                return color;
+            }
+        }
+
+        return "red";
+    }
+
+    // --------------------------------------------------
+    // ESCOLHER PRIMEIRO JOGADOR ALEATORIAMENTE
+    // --------------------------------------------------
+
+    private chooseRandomFirstPlayer(): string {
+        const sessionIds = [...this.state.players.keys()];
+
+        if (sessionIds.length === 0) {
+            return "";
+        }
+
+        const randomIndex = Math.floor(
+            Math.random() * sessionIds.length
+        );
+
+        return sessionIds[randomIndex];
+    }
+
+    // --------------------------------------------------
+    // ATUALIZAR JOGADOR SORTEADO
+    // --------------------------------------------------
+
+    private updateFirstPlayerAnnouncement(sessionId: string) {
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            this.state.firstPlayerSessionId = "";
+            this.state.firstPlayerName = "";
+            return;
+        }
+
+        this.state.firstPlayerSessionId = sessionId;
+        this.state.firstPlayerName = player.name;
+
+        console.log("==================================");
+        console.log("PRIMEIRO JOGADOR SORTEADO!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log("==================================");
+    }
+
+    // --------------------------------------------------
+    // EXIBIR ANÚNCIO DO PRIMEIRO JOGADOR
+    // --------------------------------------------------
+
+    private showFirstPlayerAnnouncement() {
+        if (this.state.status !== "playing") {
+            return;
+        }
+
+        const firstPlayerSessionId = this.chooseRandomFirstPlayer();
+
+        if (firstPlayerSessionId === "") {
+            return;
+        }
+
+        this.updateFirstPlayerAnnouncement(firstPlayerSessionId);
+
+        this.state.turnDeadline = 0;
+        this.state.showFirstPlayerMessage = true;
+
+        console.log(
+            "Exibindo anúncio do primeiro jogador por 3 segundos."
+        );
+
+        this.firstPlayerMessageDelay?.clear();
+
+        this.firstPlayerMessageDelay = this.clock.setTimeout(() => {
+            this.firstPlayerMessageDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            let selectedSessionId = this.state.firstPlayerSessionId;
+
+            if (!this.state.players.has(selectedSessionId)) {
+                selectedSessionId = this.chooseRandomFirstPlayer();
+
+                if (selectedSessionId === "") {
+                    this.state.showFirstPlayerMessage = false;
+                    this.state.firstPlayerSessionId = "";
+                    this.state.firstPlayerName = "";
+                    return;
+                }
+
+                this.updateFirstPlayerAnnouncement(selectedSessionId);
+            }
+
+            this.state.showFirstPlayerMessage = false;
+
+            console.log(
+                "Anúncio encerrado! Liberando o primeiro turno."
+            );
+
+            this.nextTurn(selectedSessionId);
+        }, FIRST_PLAYER_MESSAGE_DURATION);
+    }
+
+    // --------------------------------------------------
+    // EXIBIR ANÚNCIO DE PRISÃO
+    // --------------------------------------------------
+
+    private showPrisonAnnouncement(sessionId: string) {
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            return;
+        }
+
+        this.prisonMessageDelay?.clear();
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.state.turnDeadline = 0;
+
+        this.state.prisonPlayerSessionId = sessionId;
+        this.state.prisonPlayerName = player.name;
+        this.state.showPrisonMessage = true;
+
+        console.log("==================================");
+        console.log("JOGADOR CAIU NA PRISÃO!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log("==================================");
+
+        this.prisonMessageDelay = this.clock.setTimeout(() => {
+            this.prisonMessageDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            this.state.showPrisonMessage = false;
+            this.state.prisonPlayerName = "";
+            this.state.prisonPlayerSessionId = "";
+
+            console.log(
+                "Anúncio de prisão encerrado. Encerrando o turno do jogador."
+            );
+
+            if (
+                this.state.currentTurn === sessionId &&
+                this.state.players.has(sessionId)
+            ) {
+                this.nextTurn();
+            }
+        }, PRISON_MESSAGE_DURATION);
+    }
+
+    // --------------------------------------------------
+    // INICIAR PRAZO DA ROLAGEM EXTRA
+    // --------------------------------------------------
+
+    private startExtraRollTimer(sessionId: string) {
+        if (this.state.status !== "playing") {
+            return;
+        }
+
+        if (this.state.currentTurn !== sessionId) {
+            return;
+        }
+
+        const player = this.state.players.get(sessionId);
+
+        if (!player || !player.extraRollAvailable) {
+            return;
+        }
+
+        this.turnTimeout?.clear();
+
+        this.state.turnDeadline =
+            this.clock.currentTime + TURN_DURATION;
+
+        this.turnTimeout = this.clock.setTimeout(() => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.state.currentTurn !== sessionId) {
+                return;
+            }
+
+            const currentPlayer = this.state.players.get(sessionId);
+
+            if (
+                currentPlayer?.extraRollAvailable &&
+                !this.state.hasRolled
+            ) {
+                console.log(
+                    `Tempo esgotado! Jogador ${sessionId} perdeu a rolagem extra.`
+                );
+
+                this.nextTurn();
+            }
+        }, TURN_DURATION);
+    }
+
+    // --------------------------------------------------
+    // EXIBIR ANÚNCIO DA ROLAGEM EXTRA
+    // --------------------------------------------------
+
+    private showExtraRollAnnouncement(
+        sessionId: string,
+        reason: ExtraRollReason
+    ) {
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            return;
+        }
+
+        this.extraRollMessageDelay?.clear();
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+        this.state.turnDeadline = 0;
+
+        this.state.extraRollPlayerSessionId = sessionId;
+        this.state.extraRollPlayerName = player.name;
+        this.state.extraRollReason = reason;
+        this.state.showExtraRollMessage = true;
+
+        console.log("==================================");
+        console.log("ROLAGEM EXTRA CONCEDIDA!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log(
+            "MOTIVO:",
+            reason === "start" ? "CASA INICIAL" : "DUPLAS"
+        );
+        console.log("==================================");
+
+        this.extraRollMessageDelay = this.clock.setTimeout(() => {
+            this.extraRollMessageDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            this.state.showExtraRollMessage = false;
+            this.state.extraRollPlayerName = "";
+            this.state.extraRollPlayerSessionId = "";
+            this.state.extraRollReason = "";
+
+            this.state.dice1 = 0;
+            this.state.dice2 = 0;
+
+            console.log(
+                "Popup da rolagem extra encerrado. Liberando a partida."
+            );
+
+            this.startExtraRollTimer(sessionId);
+        }, EXTRA_ROLL_MESSAGE_DURATION);
+    }
+
+    // --------------------------------------------------
+    // GERAR CÓDIGO DE 6 CARACTERES
+    // --------------------------------------------------
+
+    private generateCode(): string {
+        let code = "";
+
+        for (let i = 0; i < 6; i++) {
+            const index = Math.floor(
+                Math.random() * this.CODE_CHARACTERS.length
+            );
+
+            code += this.CODE_CHARACTERS[index];
+        }
+
+        return code;
+    }
+
+    // --------------------------------------------------
+    // GARANTIR CÓDIGO ÚNICO
+    // --------------------------------------------------
+
+    private async generateRoomCode(): Promise<string> {
+        const existingCodes = await this.presence.smembers(
+            this.CODE_CHANNEL
+        );
+
+        let code = "";
+
+        do {
+            code = this.generateCode();
+        } while (existingCodes.includes(code));
+
+        await this.presence.sadd(this.CODE_CHANNEL, code);
+
+        return code;
+    }
+
+    // --------------------------------------------------
+    // CANCELAR CONTAGEM AUTOMÁTICA
+    // --------------------------------------------------
+
+    private clearAutoStartCountdown() {
+        this.autoStartInterval?.clear();
+        this.autoStartInterval = undefined;
+
+        this.state.autoStartCountdown = 0;
+    }
+
+    // --------------------------------------------------
+    // REINICIAR CONTAGEM AUTOMÁTICA
+    // --------------------------------------------------
+
+    private resetAutoStartCountdown() {
+        if (this.mode !== "public") {
+            this.clearAutoStartCountdown();
+            return;
+        }
+
+        if (this.state.status !== "waiting") {
+            this.clearAutoStartCountdown();
+            return;
+        }
+
+        this.clearAutoStartCountdown();
+
+        if (this.state.players.size < 2) {
+            return;
+        }
+
+        this.state.autoStartCountdown = AUTO_START_DURATION;
+
+        console.log(
+            `Contagem automática iniciada: ${this.roomId} (${AUTO_START_DURATION}s)`
+        );
+
+        this.autoStartInterval = this.clock.setInterval(() => {
+            if (this.state.status !== "waiting") {
+                this.clearAutoStartCountdown();
+                return;
+            }
+
+            if (this.state.players.size < 2) {
+                this.clearAutoStartCountdown();
+                return;
+            }
+
+            this.state.autoStartCountdown--;
+
+            console.log(
+                `Sala ${this.roomId}: ${this.state.autoStartCountdown}s`
+            );
+
+            if (this.state.autoStartCountdown <= 0) {
+                this.clearAutoStartCountdown();
+                this.startGame();
+            }
+        }, 1000);
+    }
+
+    // --------------------------------------------------
+    // INICIAR PARTIDA
+    // --------------------------------------------------
+
+    private startGame() {
+        if (this.state.status !== "waiting") {
+            return;
+        }
+
+        if (this.state.players.size < 2) {
+            return;
+        }
+
+        this.clearAutoStartCountdown();
+
+        this.randomizeSpecialCities();
+        this.broadcastBoard();
+
+        this.state.status = "playing";
+
+        this.state.currentTurn = "";
+        this.state.turnDeadline = 0;
+        this.state.turnCount = 0;
+
+        this.state.hasRolled = false;
+        this.state.hasMoved = false;
+
+        this.state.dice1 = 0;
+        this.state.dice2 = 0;
+        this.state.lastRollBy = "";
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        this.state.showFirstPlayerMessage = false;
+        this.state.firstPlayerSessionId = "";
+        this.state.firstPlayerName = "";
+
+        this.state.showExtraRollMessage = false;
+        this.state.extraRollPlayerName = "";
+        this.state.extraRollPlayerSessionId = "";
+        this.state.extraRollReason = "";
+
+        this.state.showPrisonMessage = false;
+        this.state.prisonPlayerName = "";
+        this.state.prisonPlayerSessionId = "";
+
+        this.playersResetForNewGame();
+
+        void this.setMetadata({
+            mode: this.mode,
+            status: this.state.status
+        });
+
+        this.lock();
+
+        console.log("Partida iniciada:", this.roomId);
+        console.log("Aguardando 3 segundos para iniciar o anúncio...");
+
+        this.startDelay?.clear();
+
+        this.startDelay = this.clock.setTimeout(() => {
+            this.startDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            console.log("Animação concluída! Sorteando primeiro jogador.");
+
+            this.showFirstPlayerAnnouncement();
+        }, GAME_START_DELAY);
+    }
+
+    // --------------------------------------------------
+    // REINICIAR ESTADOS DOS JOGADORES
+    // --------------------------------------------------
+
+    private playersResetForNewGame() {
+        this.state.players.forEach((player) => {
+            player.extraRollAvailable = false;
+            player.inPrison = false;
+            player.prisonAttempts = 0;
+            player.debtsAvailable = 1;
+        });
+    }
+
+    messages = {
+        select_color: (client: Client, data: any) => {
+            if (this.state.status !== "waiting") {
+                client.send(
+                    "color_error",
+                    "Não é possível trocar de cor depois que a partida começou."
+                );
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player) {
+                return;
+            }
+
+            const requestedColor = String(data?.color ?? "");
+
+            if (!this.isValidColor(requestedColor)) {
+                client.send("color_error", "Cor inválida.");
+                return;
+            }
+
+            const occupied = [...this.state.players.keys()].some(
+                sessionId => {
+                    if (sessionId === client.sessionId) {
+                        return false;
+                    }
+
+                    const otherPlayer = this.state.players.get(sessionId);
+
+                    return otherPlayer?.color === requestedColor;
+                }
+            );
+
+            if (occupied) {
+                client.send(
+                    "color_error",
+                    "Essa cor já está sendo utilizada por outro jogador."
+                );
+                return;
+            }
+
+            player.color = requestedColor;
+
+            console.log(
+                `${player.name} escolheu a cor: ${requestedColor}`
+            );
+        },
+
+        start: (client: Client) => {
+            if (this.state.status !== "waiting") {
+                client.send("start_error", "A partida já começou.");
+                return;
+            }
+
+            if (this.mode !== "private") {
+                client.send(
+                    "start_error",
+                    "Partidas públicas começam automaticamente."
+                );
+                return;
+            }
+
+            if (client.sessionId !== this.state.hostSessionId) {
+                client.send(
+                    "start_error",
+                    "Somente o anfitrião pode iniciar."
+                );
+                return;
+            }
+
+            if (this.state.players.size < 2) {
+                client.send(
+                    "start_error",
+                    "São necessários pelo menos 2 jogadores."
+                );
+                return;
+            }
+
+            this.startGame();
+        },
+
+        // --------------------------------------------------
+        // ENVIAR TABULEIRO
+        // --------------------------------------------------
+
+        get_board: (client: Client) => {
+            const boardData = this.board.map((cell, index) => ({
+                position: index,
+                name: cell.name,
+                type: cell.type,
+                spriteIndex: cell.spriteIndex
+            }));
+
+            client.send("board_data", JSON.stringify(boardData));
+
+            console.log(
+                `Tabuleiro enviado para ${client.sessionId}: ${boardData.length} casas.`
+            );
+        },
+
+        // --------------------------------------------------
+        // CONFIRMAR CHEGADA DA ANIMAÇÃO DE MOVIMENTO
+        // --------------------------------------------------
+
+        movement_arrived: (client: Client) => {
+            const pending = this.pendingMovementAnnouncement;
+
+            if (!pending) {
+                return;
+            }
+
+            if (!this.state.players.has(client.sessionId)) {
+                return;
+            }
+
+            pending.arrivedClients.add(client.sessionId);
+
+            console.log(
+                `Chegada confirmada: ${client.sessionId} (${pending.arrivedClients.size}/${this.clients.length})`
+            );
+
+            this.finishMovementAnnouncementIfReady();
+        },
+
+        // --------------------------------------------------
+        // ROLAR DADOS NORMALMENTE
+        // --------------------------------------------------
+
+        roll_dice: (client: Client) => {
+            if (this.state.status !== "playing") {
+                client.send(
+                    "action_error",
+                    "A partida ainda não começou."
+                );
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                client.send("action_error", "Não é seu turno.");
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player) {
+                return;
+            }
+
+            if (player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você precisa resolver sua situação na prisão primeiro."
+                );
+                return;
+            }
+
+            if (this.state.hasRolled) {
+                client.send(
+                    "action_error",
+                    "Você já rolou os dados nesta rodada."
+                );
+                return;
+            }
+
+            if (this.state.hasMoved && !player.extraRollAvailable) {
+                client.send(
+                    "action_error",
+                    "Você já movimentou nesta rodada."
+                );
+                return;
+            }
+
+            this.state.dice1 = Math.floor(Math.random() * 6) + 1;
+            this.state.dice2 = Math.floor(Math.random() * 6) + 1;
+
+            this.state.lastRollBy = client.sessionId;
+            this.state.hasRolled = true;
+
+            player.extraRollAvailable = false;
+            this.state.hasMoved = false;
+
+            console.log(
+                `Dados de ${client.sessionId}: ${this.state.dice1} + ${this.state.dice2}`
+            );
+        },
+
+        // --------------------------------------------------
+        // TENTAR SAIR DA PRISÃO COM DUPLAS
+        // --------------------------------------------------
+
+        prison_try_doubles: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive() || this.prisonAttemptDelay) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                client.send("action_error", "Não é seu turno.");
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player || !player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você não está na prisão."
+                );
+                return;
+            }
+
+            if (this.state.hasRolled || this.state.hasMoved) {
+                client.send(
+                    "action_error",
+                    "Não é possível tentar sair da prisão agora."
+                );
+                return;
+            }
+
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+
+            const rolledDoubles = dice1 === dice2;
+
+            player.prisonAttempts++;
+
+            // Os dados são compartilhados com o cliente para exibição.
+            // O jogador continua preso durante esse período.
+            this.state.dice1 = dice1;
+            this.state.dice2 = dice2;
+            this.state.lastRollBy = client.sessionId;
+            this.state.hasRolled = true;
+            this.state.hasMoved = false;
+
+            // Pausar o limite do turno enquanto o resultado aparece.
+            this.turnTimeout?.clear();
+            this.turnTimeout = undefined;
+            this.state.turnDeadline = 0;
+
+            console.log("==================================");
+            console.log("TENTATIVA DE SAIR DA PRISÃO");
+            console.log("JOGADOR:", player.name);
+            console.log(`DADOS: ${dice1} + ${dice2}`);
+            console.log("DUPLAS:", rolledDoubles);
+            console.log(
+                `TENTATIVA: ${player.prisonAttempts}/${MAX_PRISON_ATTEMPTS}`
+            );
+            console.log("==================================");
+
+            // Aguardar a HUD exibir os dados e o resultado.
+            this.prisonAttemptDelay?.clear();
+
+            this.prisonAttemptDelay = this.clock.setTimeout(() => {
+                this.prisonAttemptDelay = undefined;
+
+                if (this.state.status !== "playing") {
+                    return;
+                }
+
+                if (this.state.currentTurn !== client.sessionId) {
+                    return;
+                }
+
+                const currentPlayer = this.state.players.get(client.sessionId);
+
+                if (!currentPlayer || !currentPlayer.inPrison) {
+                    return;
+                }
+
+                // Conseguiu duplas: liberar e permitir uma rolagem normal.
+                if (rolledDoubles) {
+                    console.log(
+                        `${currentPlayer.name} conseguiu duplas e saiu da prisão.`
+                    );
+
+                    this.releasePlayerFromPrison(client.sessionId);
+                    return;
+                }
+
+                // Terceira tentativa: libertar automaticamente.
+                if (currentPlayer.prisonAttempts >= MAX_PRISON_ATTEMPTS) {
+                    console.log(
+                        `${currentPlayer.name} atingiu o limite de tentativas e foi liberado automaticamente.`
+                    );
+
+                    this.releasePlayerFromPrison(client.sessionId);
+                    return;
+                }
+
+                // Falhou: informar e encerrar o turno.
+                client.send(
+                    "prison_attempt_failed",
+                    {
+                        attempts: currentPlayer.prisonAttempts,
+                        maxAttempts: MAX_PRISON_ATTEMPTS
+                    }
+                );
+
+                console.log(
+                    `${currentPlayer.name} não conseguiu duplas. A próxima tentativa será no próximo turno.`
+                );
+
+                this.nextTurn();
+            }, PRISON_ATTEMPT_RESULT_DURATION);
+        },
+
+        // --------------------------------------------------
+        // PAGAR PARA SAIR DA PRISÃO
+        // --------------------------------------------------
+
+        prison_pay: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.prisonAttemptDelay) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                client.send("action_error", "Não é seu turno.");
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player || !player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você não está na prisão."
+                );
+                return;
+            }
+
+            if (player.money < PRISON_ESCAPE_COST) {
+                client.send(
+                    "action_error",
+                    "Você não possui dinheiro suficiente para pagar a saída da prisão."
+                );
+                return;
+            }
+
+            player.money -= PRISON_ESCAPE_COST;
+
+            console.log("==================================");
+            console.log("JOGADOR PAGOU PARA SAIR DA PRISÃO");
+            console.log("JOGADOR:", player.name);
+            console.log("VALOR PAGO:", PRISON_ESCAPE_COST);
+            console.log("DINHEIRO RESTANTE:", player.money);
+            console.log("==================================");
+
+            this.releasePlayerFromPrison(client.sessionId);
+        },
+
+        // --------------------------------------------------
+        // USAR DÍVIDA PARA SAIR DA PRISÃO
+        // --------------------------------------------------
+
+        prison_use_debt: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.prisonAttemptDelay) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                client.send("action_error", "Não é seu turno.");
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player || !player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você não está na prisão."
+                );
+                return;
+            }
+
+            if (player.debtsAvailable <= 0) {
+                client.send(
+                    "action_error",
+                    "Você não possui dívidas disponíveis."
+                );
+                return;
+            }
+
+            player.debtsAvailable--;
+
+            console.log("==================================");
+            console.log("JOGADOR USOU UMA DÍVIDA PARA SAIR DA PRISÃO");
+            console.log("JOGADOR:", player.name);
+            console.log(
+                "DÍVIDAS RESTANTES:",
+                player.debtsAvailable
+            );
+            console.log("==================================");
+
+            this.releasePlayerFromPrison(client.sessionId);
+        },
+
+        // --------------------------------------------------
+        // MOVIMENTAR JOGADOR
+        // --------------------------------------------------
+
+        move: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player) {
+                return;
+            }
+
+            if (player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você precisa sair da prisão antes de movimentar."
+                );
+                return;
+            }
+
+            if (
+                !this.state.hasRolled ||
+                this.state.lastRollBy !== client.sessionId
+            ) {
+                client.send(
+                    "action_error",
+                    "Você precisa rolar os dados primeiro."
+                );
+                return;
+            }
+
+            if (this.state.hasMoved) {
+                client.send(
+                    "action_error",
+                    "Você já movimentou nesta rodada."
+                );
+                return;
+            }
+
+            const dice1 = this.state.dice1;
+            const dice2 = this.state.dice2;
+
+            const rolledDoubles = dice1 === dice2;
+
+            const steps = dice1 + dice2;
+            const startingPosition = player.position;
+            const newPosition = startingPosition + steps;
+
+            const completedLaps = Math.floor(newPosition / BOARD_SIZE);
+            const landedPosition = newPosition % BOARD_SIZE;
+
+            player.position = landedPosition;
+            player.laps += completedLaps;
+
+            const landedCell = this.board[landedPosition];
+
+            player.lastCellType = landedCell.type;
+            player.lastCellName = landedCell.name;
+
+            this.state.hasMoved = true;
+
+            console.log(
+                `${player.name} avançou ${steps} casas. Posição: ${player.position}`
+            );
+
+            console.log(
+                `${player.name} caiu na casa ${player.position}: ${landedCell.name} (${landedCell.type})`
+            );
+
+            console.log(
+                `Dados: ${dice1} + ${dice2} | Duplas: ${rolledDoubles}`
+            );
+
+            if (completedLaps > 0) {
+                console.log(
+                    `${player.name} completou ${completedLaps} volta(s). Total: ${player.laps}`
+                );
+
+                const totalMoneyReward =
+                    START_CELL_MONEY_REWARD * completedLaps;
+
+                player.money += totalMoneyReward;
+
+                console.log(
+                    `${player.name} recebeu $${totalMoneyReward.toLocaleString("pt-BR")} por completar ${completedLaps} volta(s).`
+                );
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR SE CAIU NA PRISÃO
+            // --------------------------------------------------
+
+            const landedInPrison =
+                landedCell.name === "Prisão" &&
+                landedCell.type === "island";
+
+            if (landedInPrison) {
+                player.inPrison = true;
+                player.prisonAttempts = 0;
+                player.extraRollAvailable = false;
+
+                this.state.hasRolled = false;
+                this.state.hasMoved = true;
+                this.state.lastRollBy = "";
+
+                console.log(
+                    `${player.name} foi enviado para a prisão. O turno será encerrado após o anúncio.`
+                );
+
+                this.queueMovementAnnouncement(
+                    client.sessionId,
+                    "prison"
+                );
+
+                return;
+            }
+
+            const landedExactlyOnStart =
+                landedPosition === 0 &&
+                landedCell.type === "start" &&
+                landedCell.name === "Início";
+
+            const receivesStartExtraRoll =
+                landedExactlyOnStart &&
+                completedLaps > 0 &&
+                player.laps >= 1;
+
+            let extraRollReason: ExtraRollReason | undefined;
+
+            if (receivesStartExtraRoll) {
+                extraRollReason = "start";
+            }
+            else if (rolledDoubles) {
+                extraRollReason = "doubles";
+            }
+
+            const canReceiveExtraRoll =
+                extraRollReason !== undefined;
+
+            console.log(
+                `[VERIFICAÇÃO ROLAGEM EXTRA] ${player.name} | ` +
+                `posição inicial: ${startingPosition} | ` +
+                `dados: ${dice1} + ${dice2} | ` +
+                `duplas: ${rolledDoubles} | ` +
+                `posição final: ${landedPosition} | ` +
+                `voltas: ${player.laps} | ` +
+                `terminou no início: ${receivesStartExtraRoll} | ` +
+                `motivo: ${extraRollReason ?? "nenhum"} | ` +
+                `recebe extra: ${canReceiveExtraRoll}`
+            );
+
+            if (canReceiveExtraRoll && extraRollReason) {
+                player.extraRollAvailable = true;
+
+                this.state.hasRolled = false;
+                this.state.hasMoved = true;
+
+                this.state.lastRollBy = "";
+
+                console.log(
+                    `${player.name} recebeu uma rolagem extra pelo motivo: ${extraRollReason}.`
+                );
+
+                this.queueMovementAnnouncement(
+                    client.sessionId,
+                    "extra",
+                    extraRollReason
+                );
+            }
+            else {
+                // Mesmo sem popup, aguardar a animação terminar
+                // antes de liberar as ações da HUD.
+                this.queueMovementAnnouncement(
+                    client.sessionId,
+                    "none"
+                );
+            }
+        },
+
+        // --------------------------------------------------
+        // ENCERRAR TURNO
+        // --------------------------------------------------
+
+        end_turn: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                return;
+            }
+
+            if (!this.state.hasMoved) {
+                client.send(
+                    "action_error",
+                    "Você precisa movimentar antes de encerrar a jogada."
+                );
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player) {
+                return;
+            }
+
+            if (player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você ainda está na prisão."
+                );
+                return;
+            }
+
+            if (player.extraRollAvailable) {
+                client.send(
+                    "action_error",
+                    "Você precisa utilizar sua rolagem extra antes de encerrar o turno."
+                );
+                return;
+            }
+
+            console.log(
+                `Jogador ${client.sessionId} encerrou sua jogada.`
+            );
+
+            this.nextTurn();
+        },
+
+        play: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player) {
+                return;
+            }
+
+            if (player.inPrison) {
+                return;
+            }
+
+            player.score++;
+            this.nextTurn();
+        },
+    };
+
+    // --------------------------------------------------
+    // CRIAÇÃO DA SALA
+    // --------------------------------------------------
+
+    async onCreate(options: any) {
+        this.roomId = await this.generateRoomCode();
+
+        this.mode = options.mode === "private" ? "private" : "public";
+
+        this.state.status = "waiting";
+        this.state.autoStartCountdown = 0;
+
+        this.state.movementAnnouncementPending = false;
+        this.pendingMovementAnnouncement = undefined;
+
+        this.state.showFirstPlayerMessage = false;
+        this.state.firstPlayerSessionId = "";
+        this.state.firstPlayerName = "";
+
+        this.state.showExtraRollMessage = false;
+        this.state.extraRollPlayerName = "";
+        this.state.extraRollPlayerSessionId = "";
+        this.state.extraRollReason = "";
+
+        this.state.showPrisonMessage = false;
+        this.state.prisonPlayerName = "";
+        this.state.prisonPlayerSessionId = "";
+
+        await this.setMatchmaking({
+            metadata: {
+                mode: this.mode,
+                status: this.state.status
+            },
+            private: this.mode === "private"
+        });
+
+        console.log("==================================");
+        console.log("SALA CRIADA:", this.roomId);
+        console.log("MODO:", this.mode);
+        console.log("PRIVADA:", this.mode === "private");
+        console.log(
+            "LISTAGEM:",
+            this.mode === "public" ? "PUBLICA" : "OCULTA"
+        );
+        console.log("==================================");
+
+        console.log("Tabuleiro carregado:", this.board.length, "casas.");
+
+        if (this.board.length !== BOARD_SIZE) {
+            throw new Error(
+                `Tabuleiro inválido: esperado ${BOARD_SIZE}, encontrado ${this.board.length}.`
+            );
+        }
+    }
+
+    // --------------------------------------------------
+    // AUTENTICAÇÃO
+    // --------------------------------------------------
+
+    onAuth(client: Client, options: any) {
+        if (this.state.status !== "waiting") {
+            throw new ServerError(409, "Esta partida já começou.");
+        }
+
+        if (options?.mode !== this.mode) {
+            throw new ServerError(
+                403,
+                "Esta sala não pertence a essa modalidade de partida."
+            );
+        }
+
+        if (
+            options?.playerName !== undefined &&
+            typeof options.playerName !== "string"
+        ) {
+            throw new ServerError(400, "Nome de jogador inválido.");
+        }
+
+        const playerName = String(options?.playerName ?? "").trim();
+
+        if (playerName.length > 20) {
+            throw new ServerError(
+                400,
+                "O nome pode ter no máximo 20 caracteres."
+            );
+        }
+
+        const selectedCharacter = Number(
+            options?.selectedCharacter ?? 0
+        );
+
+        const validCharacter =
+            Number.isInteger(selectedCharacter) &&
+            selectedCharacter >= 0 &&
+            selectedCharacter <= 3;
+
+        if (!validCharacter) {
+            throw new ServerError(400, "Personagem inválido.");
+        }
+
+        if (playerName.length === 0) {
+            return {
+                playerName: `Jogador ${this.clients.length}`,
+                preferredColor: "red",
+                selectedCharacter
+            };
+        }
+
+        const preferredColor =
+            typeof options?.selectedColor === "string" &&
+            this.isValidColor(options.selectedColor)
+                ? options.selectedColor
+                : "red";
+
+        return {
+            playerName,
+            preferredColor,
+            selectedCharacter
+        };
+    }
+
+    // --------------------------------------------------
+    // ENTRADA DO JOGADOR
+    // --------------------------------------------------
+
+    onJoin(client: Client, options: any, auth: any) {
+        const player = new Player();
+
+        player.name = auth.playerName;
+        player.money = INITIAL_PLAYER_MONEY;
+        player.character = auth.selectedCharacter ?? 0;
+
+        player.position = 0;
+        player.laps = 0;
+        player.extraRollAvailable = false;
+
+        player.inPrison = false;
+        player.prisonAttempts = 0;
+        player.debtsAvailable = 1;
+
+        player.lastCellType = this.board[0].type;
+        player.lastCellName = this.board[0].name;
+
+        player.color = this.assignPlayerColor(
+            auth.preferredColor ?? "red"
+        );
+
+        this.state.players.set(client.sessionId, player);
+
+        this.playerJoinOrder.push(client.sessionId);
+
+        if (this.state.hostSessionId === "") {
+            this.state.hostSessionId = client.sessionId;
+        }
+
+        console.log(
+            `${player.name} entrou na sala ${this.roomId}!`
+        );
+
+        console.log(`Cor atribuída: ${player.color}`);
+        console.log(`Personagem escolhido: ${player.character}`);
+        console.log(`Dinheiro inicial: ${player.money}`);
+        console.log(`Dívidas disponíveis: ${player.debtsAvailable}`);
+
+        console.log(
+            "Ordem de entrada:",
+            this.playerJoinOrder.join(" -> ")
+        );
+
+        this.resetAutoStartCountdown();
+    }
+
+    // --------------------------------------------------
+    // SAÍDA DO JOGADOR
+    // --------------------------------------------------
+
+    onLeave(client: Client, code: CloseCode) {
+        console.log(client.sessionId, "saiu da sala!", code);
+
+        const wasTheirTurn =
+            this.state.currentTurn === client.sessionId;
+
+        const wasHost =
+            this.state.hostSessionId === client.sessionId;
+
+        const wasSelectedFirstPlayer =
+            this.state.firstPlayerSessionId === client.sessionId;
+
+        const wasExtraRollPlayer =
+            this.state.extraRollPlayerSessionId === client.sessionId;
+
+        const wasPrisonMessagePlayer =
+            this.state.prisonPlayerSessionId === client.sessionId;
+
+        this.state.players.delete(client.sessionId);
+
+        this.playerJoinOrder = this.playerJoinOrder.filter(
+            sessionId => sessionId !== client.sessionId
+        );
+
+        // Atualizar a espera de chegada caso alguém saia da sala.
+        if (this.pendingMovementAnnouncement) {
+            if (
+                this.pendingMovementAnnouncement.sessionId ===
+                client.sessionId
+            ) {
+                this.pendingMovementAnnouncement = undefined;
+                this.state.movementAnnouncementPending = false;
+            }
+            else {
+                this.pendingMovementAnnouncement.arrivedClients.delete(
+                    client.sessionId
+                );
+
+                this.finishMovementAnnouncementIfReady(
+                    client.sessionId
+                );
+            }
+        }
+
+        if (
+            this.state.showFirstPlayerMessage &&
+            wasSelectedFirstPlayer
+        ) {
+            const newFirstPlayer = this.chooseRandomFirstPlayer();
+
+            if (newFirstPlayer !== "") {
+                this.updateFirstPlayerAnnouncement(newFirstPlayer);
+            } else {
+                this.state.firstPlayerSessionId = "";
+                this.state.firstPlayerName = "";
+            }
+        }
+
+        if (
+            this.state.showExtraRollMessage &&
+            wasExtraRollPlayer
+        ) {
+            this.extraRollMessageDelay?.clear();
+            this.extraRollMessageDelay = undefined;
+
+            this.state.showExtraRollMessage = false;
+            this.state.extraRollPlayerName = "";
+            this.state.extraRollPlayerSessionId = "";
+            this.state.extraRollReason = "";
+
+            if (this.state.status === "playing" && wasTheirTurn) {
+                this.nextTurn();
+            }
+        }
+
+        if (
+            this.state.showPrisonMessage &&
+            wasPrisonMessagePlayer
+        ) {
+            this.prisonMessageDelay?.clear();
+            this.prisonMessageDelay = undefined;
+
+            this.state.showPrisonMessage = false;
+            this.state.prisonPlayerName = "";
+            this.state.prisonPlayerSessionId = "";
+        }
+
+        if (
+            this.state.status === "waiting" &&
+            wasHost
+        ) {
+            const nextHost = this.playerJoinOrder.find(
+                sessionId => this.state.players.has(sessionId)
+            );
+
+            this.state.hostSessionId = nextHost ?? "";
+
+            if (nextHost) {
+                const nextHostPlayer = this.state.players.get(nextHost);
+
+                console.log("==================================");
+                console.log("ANFITRIÃO ANTERIOR SAIU:", client.sessionId);
+                console.log("NOVA LIDERANÇA TRANSFERIDA!");
+                console.log("NOVO ANFITRIÃO:", nextHost);
+                console.log(
+                    "JOGADOR:",
+                    nextHostPlayer?.name ?? "Desconhecido"
+                );
+                console.log("==================================");
+            } else {
+                console.log(
+                    "O anfitrião saiu e não existem jogadores restantes."
+                );
+            }
+        }
+
+        this.resetAutoStartCountdown();
+
+        if (
+            this.state.status === "playing" &&
+            wasTheirTurn &&
+            !(
+                this.state.showExtraRollMessage &&
+                wasExtraRollPlayer
+            )
+        ) {
+            this.nextTurn();
+        }
+    }
+
+    // --------------------------------------------------
+    // ENCERRAMENTO DA SALA
+    // --------------------------------------------------
+
+    async onDispose() {
+        this.turnTimeout?.clear();
+        this.autoStartInterval?.clear();
+        this.startDelay?.clear();
+        this.firstPlayerMessageDelay?.clear();
+        this.extraRollMessageDelay?.clear();
+        this.prisonMessageDelay?.clear();
+        this.prisonAttemptDelay?.clear();
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        await this.presence.srem(
+            this.CODE_CHANNEL,
+            this.roomId
+        );
+
+        console.log("Sala encerrada:", this.roomId);
+    }
+
+    // --------------------------------------------------
+    // PRÓXIMO TURNO
+    // --------------------------------------------------
+
+    nextTurn(firstTurnSessionId?: string) {
+        this.turnTimeout?.clear();
+        this.prisonAttemptDelay?.clear();
+        this.prisonAttemptDelay = undefined;
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        if (this.state.status !== "playing") {
+            return;
+        }
+
+        const previousPlayer = this.state.players.get(
+            this.state.currentTurn
+        );
+
+        if (previousPlayer) {
+            previousPlayer.extraRollAvailable = false;
+        }
+
+        const sessionIds = [...this.state.players.keys()];
+
+        if (sessionIds.length === 0) {
+            this.state.currentTurn = "";
+            this.state.turnDeadline = 0;
+            return;
+        }
+
+        if (
+            firstTurnSessionId &&
+            sessionIds.includes(firstTurnSessionId)
+        ) {
+            this.state.currentTurn = firstTurnSessionId;
+        } else {
+            const previous = sessionIds.indexOf(this.state.currentTurn);
+
+            this.state.currentTurn =
+                sessionIds[(previous + 1) % sessionIds.length];
+        }
+
+        this.state.turnCount++;
+
+        this.state.hasRolled = false;
+        this.state.hasMoved = false;
+        this.state.lastRollBy = "";
+        this.state.dice1 = 0;
+        this.state.dice2 = 0;
+
+        const turnSessionId = this.state.currentTurn;
+        const currentPlayer = this.state.players.get(turnSessionId);
+
+        console.log("==================================");
+        console.log("NOVO TURNO:", this.state.turnCount);
+        console.log("JOGADOR:", currentPlayer?.name ?? "Desconhecido");
+        console.log("SESSION ID:", turnSessionId);
+
+        if (currentPlayer?.inPrison) {
+            console.log(
+                "JOGADOR ESTÁ PRESO: aguardando escolha para tentar escapar."
+            );
+        }
+
+        console.log("==================================");
+
+        this.startCurrentTurnTimer(turnSessionId);
+    }
+
+    // --------------------------------------------------
+    // RECONEXÃO
+    // --------------------------------------------------
+
+    onDrop(client: Client, code: CloseCode) {
+        this.allowReconnection(client, 30).catch(() => {});
+    }
+
+    onReconnect(client: Client) {
+        console.log(client.sessionId, "reconectou!");
+    }
+}
+"
+myroomstate:"
+import { schema, t, type SchemaType } from "@colyseus/schema";
+
+export const Player = schema({
+    name: t.string().default(""),
+    score: t.uint16().default(0),
+
+    // Dinheiro individual do jogador.
+    money: t.uint32().default(2000000),
+
+    // Cor escolhida pelo jogador.
+    color: t.string().default("red"),
+
+    // Personagem escolhido no menu.
+    character: t.uint8().default(0),
+
+    // Posição no tabuleiro.
+    position: t.uint8().default(0),
+
+    // Quantidade de voltas completas.
+    laps: t.uint16().default(0),
+
+    // Indica se o jogador possui uma rolagem extra disponível.
+    extraRollAvailable: t.boolean().default(false),
+
+    // Informações da última casa visitada.
+    lastCellType: t.string().default(""),
+    lastCellName: t.string().default(""),
+
+    // Sistema da prisão.
+    inPrison: t.boolean().default(false),
+    prisonAttempts: t.uint8().default(0),
+    debtsAvailable: t.uint8().default(1),
+});
+
+export type Player = SchemaType<typeof Player>;
+
+export const MyRoomState = schema({
+    players: t.map(Player),
+
+    hostSessionId: t.string().default(""),
+    status: t.string().default("waiting"),
+
+    autoStartCountdown: t.uint8().default(0),
+
+    currentTurn: t.string().default(""),
+    turnDeadline: t.number().default(0),
+    turnCount: t.uint16().default(0),
+
+    dice1: t.uint8().default(0),
+    dice2: t.uint8().default(0),
+
+    lastRollBy: t.string().default(""),
+
+    hasRolled: t.boolean().default(false),
+    hasMoved: t.boolean().default(false),
+
+    // Informações do anúncio do primeiro jogador.
+    showFirstPlayerMessage: t.boolean().default(false),
+    firstPlayerName: t.string().default(""),
+    firstPlayerSessionId: t.string().default(""),
+
+    // Informações do anúncio da rolagem extra.
+    showExtraRollMessage: t.boolean().default(false),
+    extraRollPlayerName: t.string().default(""),
+    extraRollPlayerSessionId: t.string().default(""),
+
+    // Motivo da rolagem extra: "start" ou "doubles".
+    extraRollReason: t.string().default(""),
+
+    // Indica que o servidor aguarda a chegada visual do jogador.
+    movementAnnouncementPending: t.boolean().default(false),
+
+    // Informações do anúncio de prisão.
+    showPrisonMessage: t.boolean().default(false),
+    prisonPlayerName: t.string().default(""),
+    prisonPlayerSessionId: t.string().default(""),
+});
+
+export type MyRoomState = SchemaType<typeof MyRoomState>;
+"
