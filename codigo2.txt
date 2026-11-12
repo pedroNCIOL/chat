@@ -660,6 +660,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
     }
 
 
+ 
     // --------------------------------------------------
     // EXIBIR ANÚNCIO DA ROLAGEM EXTRA
     // --------------------------------------------------
@@ -725,6 +726,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             this.startExtraRollTimer(sessionId);
         }, EXTRA_ROLL_MESSAGE_DURATION);
     }
+
 
 
     // --------------------------------------------------
@@ -2239,3 +2241,2766 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         console.log(client.sessionId, "reconectou!");
     }
 }"
+obj_partida create:"/// obj_partida - Create
+
+depth = -100;
+
+sprites_personagens = [
+    spr_player1,
+    spr_player2,
+    spr_player3,
+    spr_player4
+];
+
+sprites_icones_personagens = [
+    spr_icon_player1,
+    spr_icon_player2,
+    spr_icon_player3,
+    spr_icon_player4
+];
+
+partida_jogadores = [];
+partida_visuais = [];
+
+partida_turno_atual = "";
+partida_turno_anterior = "";
+
+partida_e_meu_turno = false;
+
+partida_dado1 = 0;
+partida_dado2 = 0;
+
+partida_tem_rolagem = false;
+partida_tem_movimento = false;
+
+partida_rolagem_solicitada = false;
+partida_movimento_enviado = false;
+
+partida_inicio_turno_ms = 0;
+partida_contagem_rolagem = -1;
+
+partida_botao_ativo = false;
+partida_botao_texto = "";
+
+partida_erro = "";
+
+partida_dinheiro_anterior = [];
+partida_dinheiro_animacoes = [];
+
+partida_mostrar_primeiro_jogador = false;
+partida_primeiro_jogador_nome = "";
+partida_primeiro_jogador_session_id = "";
+
+partida_mostrar_rolagem_extra = false;
+partida_rolagem_extra_nome = "";
+partida_rolagem_extra_session_id = "";
+partida_rolagem_extra_motivo = "";
+
+partida_rolagem_extra_disponivel = false;
+
+// --------------------------------------------------
+// SISTEMA DA PRISÃO
+// --------------------------------------------------
+
+partida_mostrar_prisao = false;
+partida_prisao_nome = "";
+partida_prisao_session_id = "";
+partida_prisao_motivo = "";
+
+partida_jogador_preso = false;
+partida_tentativas_prisao = 0;
+partida_dividas_disponiveis = 1;
+
+partida_prisao_menu_ativo = false;
+partida_prisao_botoes = [];
+
+partida_prisao_acao_solicitada = false;
+
+// Indica que os dados exibidos são de uma tentativa de duplas.
+partida_prisao_tentativa_em_andamento = false;
+
+// Controle da pausa dos popups.
+partida_popup_ativo = false;
+partida_popup_ativo_anterior = false;
+
+// Controle da chegada antes de exibir anúncios de destino.
+partida_movimento_anuncio_pendente = false;
+partida_turno_estava_movendo = false;
+partida_chegada_enviada = false;
+
+partida_formatar_dinheiro = function(_valor) {
+    var _numero = string(floor(_valor));
+    var _resultado = "";
+    var _contador = 0;
+
+    for (var _i = string_length(_numero); _i >= 1; _i--) {
+        _resultado = string_char_at(_numero, _i) + _resultado;
+        _contador++;
+
+        if (_contador mod 3 == 0 && _i > 1) {
+            _resultado = "." + _resultado;
+        }
+    }
+
+    return _resultado;
+};
+
+// Animação dos dados
+partida_dados_visiveis = false;
+partida_dados_hover = false;
+partida_dados_estavam_visiveis = false;
+
+partida_escala_dados = 4;
+partida_espacamento_dados = -sprite_get_width(spr_dado1) * partida_escala_dados * .75;
+
+partida_dados_animacao_inicio_ms = current_time;
+partida_dados_indice_animacao = 0;
+partida_dados_angulo = -10;
+
+partida_velocidade = 0.16;
+partida_escala_personagem = 1.25;
+
+partida_buscar_visual = function(_session_id) {
+    for (var _i = 0; _i < array_length(partida_visuais); _i++) {
+        if (partida_visuais[_i].session_id == _session_id) {
+            return _i;
+        }
+    }
+
+    return -1;
+};
+
+// Calcular centro de casa
+
+partida_centro_casa = function(_indice) {
+    var _cam_x = camera_get_view_width(view_camera[0]);
+    var _cam_y = camera_get_view_height(view_camera[0]);
+
+    var _mesa_x = -45;
+    var _mesa_y = 140;
+    var _escala = 1.60;
+
+    var _dist_x = 73 * (_escala / 1.75);
+    var _dist_y = 37 * (_escala / 1.75);
+
+    var _pos_x = 0;
+    var _pos_y = 0;
+
+    if (_indice == 0) {
+        _pos_x = _cam_x / 2 + _mesa_x;
+        _pos_y = _cam_y / 2 + _mesa_y + 100;
+    }
+    else if (_indice <= 16) {
+        if (_indice < 9) {
+            var _xx = _indice;
+            var _yy = _indice;
+
+            _pos_x = _cam_x / 2 - _xx * _dist_x + _mesa_x;
+            _pos_y = _cam_y / 2 + 100 - _yy * _dist_y + _mesa_y;
+        }
+        else {
+            var _xx = _indice - 16;
+            var _yy = _indice;
+
+            _pos_x = _cam_x / 2 + _xx * _dist_x + _mesa_x;
+            _pos_y = _cam_y / 2 + 100 - _yy * _dist_y + _mesa_y;
+        }
+    }
+    else if (_indice < 25) {
+        var _xx = _indice - 16;
+        var _yy = 32 - _indice;
+
+        _pos_x = _cam_x / 2 + _xx * _dist_x + _mesa_x;
+        _pos_y = _cam_y / 2 + 100 - _yy * _dist_y + _mesa_y;
+    }
+    else {
+        var _xx = _indice - 32;
+        var _yy = 32 - _indice;
+
+        _pos_x = _cam_x / 2 - _xx * _dist_x + _mesa_x;
+        _pos_y = _cam_y / 2 + 100 - _yy * _dist_y + _mesa_y;
+    }
+
+    var _block_offset = 0;
+    var _mapa = instance_find(obj_jogo, 0);
+
+    if (_mapa != noone) {
+        if (_indice < array_length(_mapa.block_offset)) {
+            _block_offset = _mapa.block_offset[_indice];
+        }
+    }
+
+    _pos_y -= _block_offset;
+    _pos_y += 10;
+
+    return {
+        x: _pos_x,
+        y: _pos_y
+    };
+};
+
+partida_rolar = function() {
+    if (!partida_e_meu_turno) return;
+    if (partida_popup_ativo) return;
+    if (partida_prisao_menu_ativo) return;
+    if (partida_jogador_preso) return;
+    if (partida_tem_rolagem) return;
+    if (partida_rolagem_solicitada) return;
+
+    if (
+        partida_contagem_rolagem == 0 &&
+        !partida_rolagem_extra_disponivel
+    ) return;
+
+    var _net = instance_find(obj_network_manager, 0);
+    if (_net == noone) return;
+    if (!_net.net_connected) return;
+
+    partida_rolagem_solicitada = true;
+    colyseus_send(_net.net_room, "roll_dice", {});
+};
+
+partida_encerrar_turno = function() {
+    if (!partida_e_meu_turno) return;
+    if (partida_popup_ativo) return;
+    if (partida_prisao_menu_ativo) return;
+    if (partida_jogador_preso) return;
+    if (!partida_tem_movimento) return;
+    if (partida_rolagem_extra_disponivel) return;
+
+    var _net = instance_find(obj_network_manager, 0);
+    if (_net == noone) return;
+    if (!_net.net_connected) return;
+
+    colyseus_send(_net.net_room, "end_turn", {});
+};"
+obj_partida step:"/// obj_partida - Step
+
+var _net = instance_find(obj_network_manager, 0);
+
+// --------------------------------------------------
+// VERIFICAR CONEXÃO
+// --------------------------------------------------
+
+if (_net == noone) exit;
+if (!_net.net_connected) exit;
+
+var _state = colyseus_room_get_state(_net.net_room);
+
+if (is_undefined(_state)) exit;
+
+// --------------------------------------------------
+// INICIALIZAR CONTADOR DOS DADOS
+// --------------------------------------------------
+
+if (!variable_instance_exists(id, "partida_contador_chave")) {
+    partida_contador_chave = "";
+    partida_contador_ativo = false;
+    partida_contador_valor = 0;
+    partida_contador_resultado = 0;
+    partida_contador_ultimo_passo_ms = 0;
+}
+
+// --------------------------------------------------
+// LER ESTADO DO TURNO
+// --------------------------------------------------
+
+var _current_turn = colyseus_schema_get(_state, "currentTurn");
+var _has_rolled = colyseus_schema_get(_state, "hasRolled");
+var _has_moved = colyseus_schema_get(_state, "hasMoved");
+var _dice1 = colyseus_schema_get(_state, "dice1");
+var _dice2 = colyseus_schema_get(_state, "dice2");
+var _last_roll_by = colyseus_schema_get(_state, "lastRollBy");
+
+// --------------------------------------------------
+// LER ANÚNCIO DO PRIMEIRO JOGADOR
+// --------------------------------------------------
+
+var _show_first_player_message = colyseus_schema_get(
+    _state,
+    "showFirstPlayerMessage"
+);
+
+var _first_player_name = colyseus_schema_get(
+    _state,
+    "firstPlayerName"
+);
+
+var _first_player_session_id = colyseus_schema_get(
+    _state,
+    "firstPlayerSessionId"
+);
+
+partida_mostrar_primeiro_jogador = (
+    _show_first_player_message == true
+);
+
+if (partida_mostrar_primeiro_jogador) {
+    partida_primeiro_jogador_nome = _first_player_name;
+    partida_primeiro_jogador_session_id = _first_player_session_id;
+}
+else {
+    partida_primeiro_jogador_nome = "";
+    partida_primeiro_jogador_session_id = "";
+}
+
+// --------------------------------------------------
+// LER ANÚNCIO DA ROLAGEM EXTRA
+// --------------------------------------------------
+
+var _show_extra_roll_message = colyseus_schema_get(
+    _state,
+    "showExtraRollMessage"
+);
+
+var _extra_roll_player_name = colyseus_schema_get(
+    _state,
+    "extraRollPlayerName"
+);
+
+var _extra_roll_player_session_id = colyseus_schema_get(
+    _state,
+    "extraRollPlayerSessionId"
+);
+
+var _extra_roll_reason = colyseus_schema_get(
+    _state,
+    "extraRollReason"
+);
+
+partida_mostrar_rolagem_extra = (
+    _show_extra_roll_message == true
+);
+
+if (partida_mostrar_rolagem_extra) {
+    partida_rolagem_extra_nome = _extra_roll_player_name;
+    partida_rolagem_extra_session_id = _extra_roll_player_session_id;
+    partida_rolagem_extra_motivo = _extra_roll_reason;
+}
+else {
+    partida_rolagem_extra_nome = "";
+    partida_rolagem_extra_session_id = "";
+    partida_rolagem_extra_motivo = "";
+}
+
+
+// --------------------------------------------------
+// LER ANÚNCIO DA PRISÃO
+// --------------------------------------------------
+
+var _show_prison_message = colyseus_schema_get(
+    _state,
+    "showPrisonMessage"
+);
+
+var _prison_player_name = colyseus_schema_get(
+    _state,
+    "prisonPlayerName"
+);
+
+var _prison_player_session_id = colyseus_schema_get(
+    _state,
+    "prisonPlayerSessionId"
+);
+
+var _prison_message_reason = colyseus_schema_get(
+    _state,
+    "prisonMessageReason"
+);
+
+partida_mostrar_prisao = (_show_prison_message == true);
+
+if (partida_mostrar_prisao) {
+
+    partida_prisao_nome = _prison_player_name;
+    partida_prisao_session_id = _prison_player_session_id;
+
+    partida_prisao_motivo = _prison_message_reason;
+
+} else {
+
+    partida_prisao_nome = "";
+    partida_prisao_session_id = "";
+    partida_prisao_motivo = "";
+}
+
+
+// --------------------------------------------------
+// IDENTIFICAR PAUSA DOS POPUPS
+// --------------------------------------------------
+
+partida_movimento_anuncio_pendente = (
+    colyseus_schema_get(_state, "movementAnnouncementPending") == true
+);
+
+partida_popup_ativo = (
+    partida_mostrar_primeiro_jogador ||
+    partida_mostrar_rolagem_extra ||
+    partida_mostrar_prisao
+);
+
+if (
+    partida_popup_ativo_anterior &&
+    !partida_popup_ativo
+) {
+    partida_inicio_turno_ms = current_time;
+
+    partida_contador_ativo = false;
+    partida_contador_chave = "";
+
+    partida_dados_estavam_visiveis = false;
+}
+
+partida_popup_ativo_anterior = partida_popup_ativo;
+
+// --------------------------------------------------
+// LER ESTADO DE PRISÃO DO JOGADOR LOCAL
+// --------------------------------------------------
+
+var _local_player_state = colyseus_map_get(
+    _state,
+    "players",
+    _net.net_session_id
+);
+
+partida_jogador_preso = false;
+partida_tentativas_prisao = 0;
+partida_dividas_disponiveis = 0;
+
+if (!is_undefined(_local_player_state)) {
+
+    var _local_in_prison = colyseus_schema_get(
+        _local_player_state,
+        "inPrison"
+    );
+
+    var _local_prison_attempts = colyseus_schema_get(
+        _local_player_state,
+        "prisonAttempts"
+    );
+
+    var _local_debts_available = colyseus_schema_get(
+        _local_player_state,
+        "debtsAvailable"
+    );
+
+    partida_jogador_preso = (_local_in_prison == true);
+
+    if (!is_undefined(_local_prison_attempts)) {
+        partida_tentativas_prisao = _local_prison_attempts;
+    }
+
+    if (!is_undefined(_local_debts_available)) {
+        partida_dividas_disponiveis = _local_debts_available;
+    }
+}
+
+// Se deixou de estar preso, não é mais uma tentativa de fuga.
+if (!partida_jogador_preso) {
+    partida_prisao_tentativa_em_andamento = false;
+    partida_prisao_acao_solicitada = false;
+}
+
+// --------------------------------------------------
+// CALCULAR POSIÇÕES DOS BOTÕES DA PRISÃO
+// --------------------------------------------------
+
+var _gui_w = display_get_gui_width();
+var _gui_h = display_get_gui_height();
+
+var _prison_button_scale = 2.5;
+
+var _prison_button_width =
+    sprite_get_width(spr_botao2) * _prison_button_scale;
+
+var _prison_button_height =
+    sprite_get_height(spr_botao2) * _prison_button_scale;
+
+var _prison_button_center_x = _gui_w / 2;
+var _prison_button_center_y = _gui_h / 2 + 10;
+
+partida_prisao_botoes = [
+    {
+        x: _prison_button_center_x,
+        y: _prison_button_center_y - _prison_button_height * 0.85,
+        texto: "tentar duplas"
+    },
+    {
+        x: _prison_button_center_x,
+        y: _prison_button_center_y,
+        texto: "Pagar 200k"
+    },
+    {
+        x: _prison_button_center_x,
+        y: _prison_button_center_y + _prison_button_height * 0.85,
+        texto: "cobrar divida"
+    }
+];
+
+// --------------------------------------------------
+// ATUALIZAR ANIMAÇÕES DE GANHO/PERDA DE DINHEIRO
+// --------------------------------------------------
+
+var _dinheiro_animacoes_ativas = [];
+
+for (
+    var _anim_index = 0;
+    _anim_index < array_length(partida_dinheiro_animacoes);
+    _anim_index++
+) {
+
+    var _anim_dinheiro = partida_dinheiro_animacoes[_anim_index];
+
+    if (partida_popup_ativo || partida_movimento_anuncio_pendente) {
+        _anim_dinheiro.start_ms = -1;
+    }
+    else if (_anim_dinheiro.start_ms < 0) {
+        _anim_dinheiro.start_ms = current_time;
+    }
+
+    if (
+        _anim_dinheiro.start_ms < 0 ||
+        current_time - _anim_dinheiro.start_ms < 2000
+    ) {
+        _dinheiro_animacoes_ativas[
+            array_length(_dinheiro_animacoes_ativas)
+        ] = _anim_dinheiro;
+    }
+}
+
+partida_dinheiro_animacoes = _dinheiro_animacoes_ativas;
+
+// --------------------------------------------------
+// LER RECOMPENSA DO JOGADOR LOCAL
+// --------------------------------------------------
+
+partida_rolagem_extra_disponivel = false;
+
+if (!is_undefined(_local_player_state)) {
+
+    var _local_extra_roll = colyseus_schema_get(
+        _local_player_state,
+        "extraRollAvailable"
+    );
+
+    partida_rolagem_extra_disponivel = (
+        _local_extra_roll == true
+    );
+}
+
+// --------------------------------------------------
+// DETECTAR MUDANÇA DE TURNO
+// --------------------------------------------------
+
+var _turn_changed = (_current_turn != partida_turno_anterior);
+
+var _previous_has_rolled = partida_tem_rolagem;
+
+if (_turn_changed) {
+
+    partida_turno_anterior = _current_turn;
+
+    partida_rolagem_solicitada = false;
+    partida_movimento_enviado = false;
+    partida_prisao_acao_solicitada = false;
+    partida_turno_estava_movendo = false;
+    partida_chegada_enviada = false;
+
+    // A tentativa anterior terminou ao mudar o turno.
+    partida_prisao_tentativa_em_andamento = false;
+
+    partida_dado1 = 0;
+    partida_dado2 = 0;
+
+    partida_inicio_turno_ms = current_time;
+    partida_contagem_rolagem = -1;
+
+    partida_contador_ativo = false;
+    partida_contador_chave = "";
+}
+
+partida_turno_atual = _current_turn;
+partida_e_meu_turno = (_current_turn == _net.net_session_id);
+
+// --------------------------------------------------
+// DETECTAR LIBERAÇÃO DA ROLAGEM EXTRA
+// --------------------------------------------------
+
+if (
+    !_turn_changed &&
+    _previous_has_rolled &&
+    !_has_rolled &&
+    _has_moved &&
+    partida_rolagem_extra_disponivel
+) {
+
+    partida_rolagem_solicitada = false;
+    partida_movimento_enviado = false;
+
+    partida_contador_ativo = false;
+    partida_contador_chave = "";
+
+    partida_dado1 = 0;
+    partida_dado2 = 0;
+}
+
+// --------------------------------------------------
+// ATUALIZAR ESTADO DOS DADOS
+// --------------------------------------------------
+
+partida_tem_rolagem = _has_rolled;
+partida_tem_movimento = _has_moved;
+
+partida_dado1 = _dice1;
+partida_dado2 = _dice2;
+
+// --------------------------------------------------
+// INICIAR CONTAGEM ANIMADA DO RESULTADO
+// --------------------------------------------------
+
+var _pode_exibir_resultado_prisao = (
+    partida_jogador_preso &&
+    partida_prisao_tentativa_em_andamento
+);
+
+if (
+    partida_tem_rolagem &&
+    (!partida_jogador_preso || _pode_exibir_resultado_prisao) &&
+    partida_dado1 >= 1 &&
+    partida_dado1 <= 6 &&
+    partida_dado2 >= 1 &&
+    partida_dado2 <= 6
+) {
+
+    var _roll_key =
+        string(_current_turn) + "_" +
+        string(_last_roll_by) + "_" +
+        string(partida_dado1) + "_" +
+        string(partida_dado2);
+
+    if (_roll_key != partida_contador_chave) {
+
+        partida_contador_chave = _roll_key;
+
+        partida_contador_resultado =
+            partida_dado1 + partida_dado2;
+
+        partida_contador_valor =
+            (partida_contador_resultado mod 12) + 1;
+
+        partida_contador_ativo = true;
+        partida_contador_ultimo_passo_ms = current_time;
+    }
+}
+
+// --------------------------------------------------
+// ATUALIZAR CONTAGEM ANIMADA
+// --------------------------------------------------
+
+if (partida_contador_ativo && !partida_popup_ativo) {
+
+    var _intervalo_contador = 50;
+
+    if (
+        current_time - partida_contador_ultimo_passo_ms >=
+        _intervalo_contador
+    ) {
+
+        partida_contador_ultimo_passo_ms = current_time;
+
+        partida_contador_valor++;
+
+        if (partida_contador_valor > 12) {
+            partida_contador_valor = 1;
+        }
+
+        if (
+            partida_contador_valor ==
+            partida_contador_resultado
+        ) {
+            partida_contador_ativo = false;
+        }
+    }
+}
+
+// --------------------------------------------------
+// CONTAGEM REGRESSIVA PARA ROLAR OS DADOS
+// --------------------------------------------------
+
+partida_contagem_rolagem = -1;
+
+if (
+    partida_e_meu_turno &&
+    !partida_jogador_preso &&
+    !partida_tem_rolagem &&
+    !partida_rolagem_extra_disponivel &&
+    !partida_popup_ativo &&
+    !partida_movimento_anuncio_pendente
+) {
+
+    var _tempo_decorrido = current_time - partida_inicio_turno_ms;
+
+    if (_tempo_decorrido >= 5000) {
+
+        var _tempo_restante = 15000 - _tempo_decorrido;
+
+        partida_contagem_rolagem = clamp(
+            ceil(_tempo_restante / 1000),
+            0,
+            10
+        );
+    }
+}
+
+// --------------------------------------------------
+// ATUALIZAR JOGADORES
+// --------------------------------------------------
+
+partida_jogadores = [];
+
+var _dinheiro_anterior_atual = [];
+
+var _total_jogadores = array_length(_net.net_players);
+
+for (var _player_index = 0; _player_index < _total_jogadores; _player_index++) {
+
+    var _id = _net.net_players[_player_index].session_id;
+    var _player_name = _net.net_players[_player_index].name;
+
+    var _player_state = colyseus_map_get(
+        _state,
+        "players",
+        _id
+    );
+
+    if (is_undefined(_player_state)) continue;
+
+    var _player_color = colyseus_schema_get(
+        _player_state,
+        "color"
+    );
+
+    if (is_undefined(_player_color)) {
+        _player_color = "";
+    }
+
+    var _player_money = colyseus_schema_get(
+        _player_state,
+        "money"
+    );
+
+    if (is_undefined(_player_money)) {
+        _player_money = 0;
+    }
+
+    // --------------------------------------------------
+    // DETECTAR ALTERAÇÃO NO DINHEIRO DO JOGADOR
+    // --------------------------------------------------
+
+    var _dinheiro_anterior_index = -1;
+
+    for (
+        var _dinheiro_index = 0;
+        _dinheiro_index < array_length(partida_dinheiro_anterior);
+        _dinheiro_index++
+    ) {
+
+        if (
+            partida_dinheiro_anterior[_dinheiro_index].session_id == _id
+        ) {
+            _dinheiro_anterior_index = _dinheiro_index;
+            break;
+        }
+    }
+
+    if (_dinheiro_anterior_index != -1) {
+
+        var _dinheiro_anterior_valor =
+            partida_dinheiro_anterior[_dinheiro_anterior_index].money;
+
+        if (_player_money != _dinheiro_anterior_valor) {
+
+            var _diferenca_dinheiro =
+                _player_money - _dinheiro_anterior_valor;
+
+            var _valor_alteracao = abs(_diferenca_dinheiro);
+
+            var _animacao_encontrada = -1;
+
+            for (
+                var _anim_index = 0;
+                _anim_index < array_length(partida_dinheiro_animacoes);
+                _anim_index++
+            ) {
+
+                if (
+                    partida_dinheiro_animacoes[_anim_index].session_id == _id
+                ) {
+                    _animacao_encontrada = _anim_index;
+                    break;
+                }
+            }
+
+            var _inicio_animacao_dinheiro = current_time;
+
+            if (partida_popup_ativo || partida_movimento_anuncio_pendente) {
+                _inicio_animacao_dinheiro = -1;
+            }
+
+            var _nova_animacao_dinheiro = {
+                session_id: _id,
+                amount: _valor_alteracao,
+                negative: (_diferenca_dinheiro < 0),
+                start_ms: _inicio_animacao_dinheiro
+            };
+
+            if (_animacao_encontrada != -1) {
+                partida_dinheiro_animacoes[_animacao_encontrada] =
+                    _nova_animacao_dinheiro;
+            }
+            else {
+                partida_dinheiro_animacoes[
+                    array_length(partida_dinheiro_animacoes)
+                ] = _nova_animacao_dinheiro;
+            }
+        }
+    }
+
+    _dinheiro_anterior_atual[
+        array_length(_dinheiro_anterior_atual)
+    ] = {
+        session_id: _id,
+        money: _player_money
+    };
+
+    var _server_position = colyseus_schema_get(
+        _player_state,
+        "position"
+    );
+
+    if (is_undefined(_server_position)) continue;
+
+    _server_position = clamp(_server_position, 0, 31);
+
+    var _visual_index = partida_buscar_visual(_id);
+
+    if (_visual_index == -1) {
+
+        var _initial_pos = partida_centro_casa(_server_position);
+
+        var _new_visual = {
+            session_id: _id,
+            server_position: _server_position,
+            x: _initial_pos.x,
+            y: _initial_pos.y,
+            path: [],
+            path_index: 0,
+            moving: false
+        };
+
+        partida_visuais[array_length(partida_visuais)] = _new_visual;
+
+        _visual_index = array_length(partida_visuais) - 1;
+
+        show_debug_message(
+            "JOGADOR VISUAL CRIADO: " +
+            string(_player_name) +
+            " | POSIÇÃO: " +
+            string(_server_position)
+        );
+    }
+
+    var _visual = partida_visuais[_visual_index];
+
+
+	// --------------------------------------------------
+	// DETECTAR MUDANÇA DE CASA
+	// --------------------------------------------------
+
+	if (_server_position != _visual.server_position) {
+
+	    var _old_position = _visual.server_position;
+
+	    // --------------------------------------------------
+	    // IDENTIFICAR MOVIMENTO ESPECIAL PARA A PRISÃO
+	    // --------------------------------------------------
+
+	    var _movimento_para_tras = (
+	        colyseus_schema_get(
+	            _player_state,
+	            "prisonReturnBackward"
+	        ) == true
+	    );
+
+	    var _steps = 0;
+	    var _direcao_passos = 1;
+
+	    if (_movimento_para_tras) {
+
+	        // Retroceder pelo tabuleiro.
+	        _steps = (_old_position - _server_position + 32) mod 32;
+	        _direcao_passos = -1;
+
+	    } else {
+
+	        // Movimento normal, sempre para frente.
+	        _steps = (_server_position - _old_position + 32) mod 32;
+	        _direcao_passos = 1;
+	    }
+
+	    _visual.path = [];
+	    _visual.path_index = 0;
+
+	    // --------------------------------------------------
+	    // CRIAR CAMINHO CASA POR CASA
+	    // --------------------------------------------------
+
+	    for (
+	        var _path_step = 1;
+	        _path_step <= _steps;
+	        _path_step++
+	    ) {
+
+	        var _next_position = (
+	            _old_position +
+	            (_path_step * _direcao_passos) +
+	            32
+	        ) mod 32;
+
+	        _visual.path[
+	            array_length(_visual.path)
+	        ] = _next_position;
+	    }
+
+	    _visual.server_position = _server_position;
+
+	    _visual.moving = (
+	        array_length(_visual.path) > 0
+	    );
+
+	    show_debug_message(
+	        "MOVIMENTO DO JOGADOR: " +
+	        string(_old_position) +
+	        " -> " +
+	        string(_server_position) +
+	        " | DIRECAO: " +
+	        string(_direcao_passos)
+	    );
+	}
+
+
+    // --------------------------------------------------
+    // MOVIMENTAR ATÉ O CENTRO DE CADA CASA
+    // --------------------------------------------------
+
+    if (_visual.moving && !partida_popup_ativo) {
+
+        var _target_position = _visual.path[_visual.path_index];
+        var _target = partida_centro_casa(_target_position);
+
+        var _distancia = point_distance(
+            _visual.x,
+            _visual.y,
+            _target.x,
+            _target.y
+        );
+
+        if (_distancia <= 2) {
+
+            _visual.x = _target.x;
+            _visual.y = _target.y;
+
+            _visual.path_index++;
+
+            if (_visual.path_index >= array_length(_visual.path)) {
+
+                _visual.moving = false;
+                _visual.path = [];
+                _visual.path_index = 0;
+            }
+        }
+        else {
+
+            var _passo = min(
+                _distancia,
+                max(1, _distancia * partida_velocidade)
+            );
+
+            var _direcao = point_direction(
+                _visual.x,
+                _visual.y,
+                _target.x,
+                _target.y
+            );
+
+            _visual.x += lengthdir_x(_passo, _direcao);
+            _visual.y += lengthdir_y(_passo, _direcao);
+        }
+    }
+
+    // --------------------------------------------------
+    // SINCRONIZAR JOGADOR PARADO COM A CASA
+    // --------------------------------------------------
+
+    if (!_visual.moving) {
+
+        var _current_target = partida_centro_casa(_server_position);
+
+        _visual.x = _current_target.x;
+        _visual.y = _current_target.y;
+    }
+
+    // --------------------------------------------------
+    // REGISTRAR JOGADOR
+    // --------------------------------------------------
+
+    var _selected_character = colyseus_schema_get(
+        _player_state,
+        "character"
+    );
+
+    if (is_undefined(_selected_character)) {
+        _selected_character = 0;
+    }
+
+    _selected_character = clamp(
+        _selected_character,
+        0,
+        array_length(sprites_personagens) - 1
+    );
+
+    partida_jogadores[array_length(partida_jogadores)] = {
+        session_id: _id,
+        name: _player_name,
+        color: _player_color,
+        money: _player_money,
+        position: _server_position,
+
+        sprite: sprites_personagens[_selected_character],
+        icon: sprites_icones_personagens[_selected_character],
+
+        x: _visual.x,
+        y: _visual.y,
+        moving: _visual.moving
+    };
+}
+
+// --------------------------------------------------
+// CONFIRMAR CHEGADA DO JOGADOR ATUAL EM TODOS OS CLIENTES
+// --------------------------------------------------
+
+var _jogador_do_turno_movendo = false;
+
+for (
+    var _chegada_index = 0;
+    _chegada_index < array_length(partida_jogadores);
+    _chegada_index++
+) {
+    if (
+        partida_jogadores[_chegada_index].session_id == _current_turn
+    ) {
+        _jogador_do_turno_movendo =
+            partida_jogadores[_chegada_index].moving;
+        break;
+    }
+}
+
+if (_jogador_do_turno_movendo) {
+    partida_turno_estava_movendo = true;
+    partida_chegada_enviada = false;
+}
+else if (
+    partida_turno_estava_movendo &&
+    !partida_chegada_enviada
+) {
+    colyseus_send(
+        _net.net_room,
+        "movement_arrived",
+        {}
+    );
+
+    partida_chegada_enviada = true;
+    partida_turno_estava_movendo = false;
+}
+
+partida_dinheiro_anterior = _dinheiro_anterior_atual;
+
+// --------------------------------------------------
+// ENVIAR MOVIMENTAÇÃO AO SERVIDOR
+// --------------------------------------------------
+
+if (
+    !partida_popup_ativo &&
+    !partida_movimento_anuncio_pendente &&
+    !partida_prisao_menu_ativo &&
+    !partida_jogador_preso &&
+    partida_e_meu_turno &&
+    partida_tem_rolagem &&
+    _last_roll_by == _net.net_session_id &&
+    !partida_movimento_enviado
+) {
+
+    partida_movimento_enviado = true;
+
+    colyseus_send(
+        _net.net_room,
+        "move",
+        {}
+    );
+}
+
+// --------------------------------------------------
+// IDENTIFICAR MOVIMENTAÇÃO DO JOGADOR LOCAL
+// --------------------------------------------------
+
+var _local_moving = false;
+
+for (var _local_index = 0; _local_index < array_length(partida_jogadores); _local_index++) {
+
+    if (partida_jogadores[_local_index].session_id == _net.net_session_id) {
+
+        _local_moving = partida_jogadores[_local_index].moving;
+        break;
+    }
+}
+
+// --------------------------------------------------
+// CONTROLAR MENU DA PRISÃO
+// --------------------------------------------------
+
+partida_prisao_menu_ativo = (
+    partida_jogador_preso &&
+    partida_e_meu_turno &&
+    !partida_popup_ativo &&
+    !partida_movimento_anuncio_pendente &&
+    !_local_moving &&
+    !partida_prisao_tentativa_em_andamento
+);
+
+// --------------------------------------------------
+// CONTROLAR BOTÃO INFERIOR
+// --------------------------------------------------
+
+partida_botao_ativo = false;
+partida_botao_texto = "";
+
+if (partida_popup_ativo || partida_movimento_anuncio_pendente || partida_prisao_menu_ativo) {
+
+    partida_botao_texto = "";
+
+}
+else if (partida_e_meu_turno) {
+
+    if (partida_jogador_preso) {
+
+        partida_botao_texto = "";
+
+    }
+    else if (!partida_tem_rolagem) {
+
+        if (partida_rolagem_solicitada) {
+            partida_botao_texto = "ROLANDO DADOS...";
+        }
+        else if (partida_rolagem_extra_disponivel) {
+            partida_botao_texto = "ROLE NOVAMENTE!";
+        }
+        else if (partida_contagem_rolagem == 0) {
+            partida_botao_texto = "TEMPO ESGOTADO";
+        }
+        else {
+            partida_botao_texto = "AGUARDE...";
+        }
+
+    }
+    else if (partida_tem_movimento) {
+
+        if (_local_moving) {
+            partida_botao_texto = "MOVENDO...";
+        }
+        else {
+            partida_botao_texto = "ENCERRAR TURNO";
+            partida_botao_ativo = !partida_rolagem_extra_disponivel;
+        }
+
+    }
+    else {
+        partida_botao_texto = "AGUARDE...";
+    }
+
+}
+else {
+    partida_botao_texto = "AGUARDE SEU TURNO";
+}
+
+// --------------------------------------------------
+// ÁREA ÚNICA DOS DOIS DADOS
+// --------------------------------------------------
+
+var _mouse_x = device_mouse_x_to_gui(0);
+var _mouse_y = device_mouse_y_to_gui(0);
+
+var _dado_largura = sprite_get_width(spr_dado1) * partida_escala_dados;
+var _dado_altura = sprite_get_height(spr_dado1) * partida_escala_dados;
+
+var _grupo_largura =
+    (_dado_largura * 2) +
+    partida_espacamento_dados;
+
+var _dados_x = (_gui_w - _grupo_largura) / 2;
+var _dados_y = (_gui_h - _dado_altura) / 2;
+
+partida_dados_visiveis = (
+    !partida_popup_ativo &&
+    !partida_movimento_anuncio_pendente &&
+    !partida_prisao_menu_ativo &&
+    !partida_jogador_preso &&
+    partida_e_meu_turno &&
+    !partida_tem_rolagem &&
+    !partida_rolagem_solicitada &&
+    !_local_moving &&
+    (
+        partida_contagem_rolagem != 0 ||
+        partida_rolagem_extra_disponivel
+    )
+);
+
+// --------------------------------------------------
+// DETECTAR QUANDO OS DADOS APARECEM
+// --------------------------------------------------
+
+if (
+    partida_dados_visiveis &&
+    !partida_dados_estavam_visiveis
+) {
+
+    partida_dados_animacao_inicio_ms = current_time;
+    partida_dados_indice_animacao = 0;
+    partida_dados_angulo = -20;
+}
+
+// --------------------------------------------------
+// VERIFICAR HOVER DA ÁREA ÚNICA
+// --------------------------------------------------
+
+partida_dados_hover = false;
+
+if (partida_dados_visiveis) {
+
+    partida_dados_hover = point_in_rectangle(
+        _mouse_x,
+        _mouse_y,
+        _dados_x,
+        _dados_y,
+        _dados_x + _grupo_largura,
+        _dados_y + _dado_altura
+    );
+}
+
+// --------------------------------------------------
+// ANIMAÇÃO DOS FRAMES DOS DADOS
+// --------------------------------------------------
+
+if (partida_dados_visiveis) {
+
+    var _tempo_animacao_dados =
+        current_time - partida_dados_animacao_inicio_ms;
+
+    var _fase_animacao_dados =
+        floor(_tempo_animacao_dados / 1000) mod 2;
+
+    if (partida_dados_hover) {
+        partida_dados_indice_animacao = 2 + _fase_animacao_dados;
+    }
+    else {
+        partida_dados_indice_animacao = _fase_animacao_dados;
+    }
+
+    partida_dados_angulo = lerp(
+        partida_dados_angulo,
+        0,
+        0.12
+    );
+
+    if (abs(partida_dados_angulo) < 0.05) {
+        partida_dados_angulo = 0;
+    }
+}
+
+partida_dados_estavam_visiveis = partida_dados_visiveis;
+
+// --------------------------------------------------
+// CLIQUES NA INTERFACE
+// --------------------------------------------------
+
+var _button_x1 = _gui_w / 2 - 150;
+var _button_y1 = _gui_h - 115;
+var _button_x2 = _gui_w / 2 + 150;
+var _button_y2 = _gui_h - 45;
+
+if (mouse_check_button_pressed(mb_left)) {
+
+    // --------------------------------------------------
+    // BOTÕES DA PRISÃO
+    // --------------------------------------------------
+
+    if (
+        partida_prisao_menu_ativo &&
+        !partida_prisao_acao_solicitada &&
+        !partida_popup_ativo
+    ) {
+
+        for (
+            var _prison_button_index = 0;
+            _prison_button_index < array_length(partida_prisao_botoes);
+            _prison_button_index++
+        ) {
+
+            var _prison_button = partida_prisao_botoes[_prison_button_index];
+
+            var _prison_button_x1 =
+                _prison_button.x - _prison_button_width / 2;
+
+            var _prison_button_y1 =
+                _prison_button.y - _prison_button_height / 2;
+
+            var _prison_button_x2 =
+                _prison_button.x + _prison_button_width / 2;
+
+            var _prison_button_y2 =
+                _prison_button.y + _prison_button_height / 2;
+
+            if (
+                point_in_rectangle(
+                    _mouse_x,
+                    _mouse_y,
+                    _prison_button_x1,
+                    _prison_button_y1,
+                    _prison_button_x2,
+                    _prison_button_y2
+                )
+            ) {
+
+                if (_prison_button_index == 0) {
+
+                    // Esconder o menu imediatamente.
+                    partida_prisao_menu_ativo = false;
+
+                    // Marcar esta rolagem como tentativa de fuga.
+                    partida_prisao_tentativa_em_andamento = true;
+
+                    // Limpar o resultado anterior.
+                    partida_dado1 = 0;
+                    partida_dado2 = 0;
+                    partida_tem_rolagem = false;
+
+                    partida_contador_ativo = false;
+                    partida_contador_chave = "";
+
+                    partida_dados_estavam_visiveis = false;
+
+                    colyseus_send(
+                        _net.net_room,
+                        "prison_try_doubles",
+                        {}
+                    );
+
+                    partida_prisao_acao_solicitada = true;
+                }
+                else if (_prison_button_index == 1) {
+
+                    colyseus_send(
+                        _net.net_room,
+                        "prison_pay",
+                        {}
+                    );
+
+                    partida_prisao_acao_solicitada = true;
+                }
+                else if (_prison_button_index == 2) {
+
+                    if (partida_dividas_disponiveis > 0) {
+
+                        colyseus_send(
+                            _net.net_room,
+                            "prison_use_debt",
+                            {}
+                        );
+
+                        partida_prisao_acao_solicitada = true;
+                    }
+                }
+
+                break;
+            }
+        }
+    }
+
+    // --------------------------------------------------
+    // DADOS E BOTÃO NORMAL
+    // --------------------------------------------------
+
+    else if (
+        !partida_popup_ativo &&
+        !partida_movimento_anuncio_pendente &&
+        !partida_prisao_menu_ativo
+    ) {
+
+        if (partida_dados_visiveis && partida_dados_hover) {
+            partida_rolar();
+        }
+
+        else if (
+            partida_botao_ativo &&
+            point_in_rectangle(
+                _mouse_x,
+                _mouse_y,
+                _button_x1,
+                _button_y1,
+                _button_x2,
+                _button_y2
+            )
+        ) {
+            partida_encerrar_turno();
+        }
+    }
+}"
+obj_partida draw gui:"/// obj_partida - Draw GUI
+
+var _gui_w = display_get_gui_width();
+var _gui_h = display_get_gui_height();
+
+// --------------------------------------------------
+// IDENTIFICAR JOGADOR LOCAL
+// --------------------------------------------------
+
+var _net = instance_find(obj_network_manager, 0);
+var _meu_session_id = "";
+
+if (_net != noone) {
+    _meu_session_id = _net.net_session_id;
+}
+
+// --------------------------------------------------
+// INICIALIZAR ANIMAÇÕES
+// --------------------------------------------------
+
+if (!variable_instance_exists(id, "partida_icone_multiplicadores")) {
+    partida_icone_multiplicadores = [1, 1, 1, 1];
+}
+
+if (!variable_instance_exists(id, "partida_barra_back_desloc_x")) {
+    partida_barra_back_desloc_x = [0, 0];
+    partida_barra_back_desloc_y = [0, 0];
+}
+
+// --------------------------------------------------
+// HUD DOS JOGADORES
+// --------------------------------------------------
+
+var _barra_escala = 3.5;
+
+var _barra_largura = sprite_get_width(spr_barra) * _barra_escala;
+var _barra_altura = sprite_get_height(spr_barra) * _barra_escala;
+
+for (var _barra_index = 0; _barra_index < 4; _barra_index++) {
+
+    var _barra_cor = "";
+    var _barra_x = 0;
+    var _barra_y = 0;
+
+    switch (_barra_index) {
+
+        case 0:
+            _barra_cor = "red";
+            _barra_x = 0;
+            _barra_y = -135;
+        break;
+
+        case 1:
+            _barra_cor = "green";
+            _barra_x = _gui_w - _barra_largura;
+            _barra_y = -135;
+        break;
+
+        case 2:
+            _barra_cor = "yellow";
+            _barra_x = 0;
+            _barra_y = _gui_h - _barra_altura + 137;
+        break;
+
+        case 3:
+            _barra_cor = "blue";
+            _barra_x = _gui_w - _barra_largura;
+            _barra_y = _gui_h - _barra_altura + 137;
+        break;
+    }
+
+    var _nome_jogador = "";
+    var _dinheiro_jogador = 0;
+    var _icone_jogador = -1;
+    var _session_id_jogador = "";
+
+    for (var _player_index = 0; _player_index < array_length(partida_jogadores); _player_index++) {
+
+        if (partida_jogadores[_player_index].color == _barra_cor) {
+
+            _nome_jogador = partida_jogadores[_player_index].name;
+            _dinheiro_jogador = partida_jogadores[_player_index].money;
+            _icone_jogador = partida_jogadores[_player_index].icon;
+            _session_id_jogador = partida_jogadores[_player_index].session_id;
+
+            break;
+        }
+    }
+
+    if (_nome_jogador == "") continue;
+
+    var _icone_e_turno = (
+        _session_id_jogador == partida_turno_atual &&
+        partida_turno_atual != ""
+    );
+
+    var _icone_largura = sprite_get_width(_icone_jogador);
+    var _icone_altura = sprite_get_height(_icone_jogador);
+
+    var _icone_escala = min(
+        1,
+        (_barra_altura * 0.6) / _icone_altura
+    ) * 2.5;
+
+    var _icone_multiplicador_alvo = 1;
+
+    if (_icone_e_turno) {
+        _icone_multiplicador_alvo = 1.2;
+    }
+
+    var _icone_multiplicador_atual =
+        partida_icone_multiplicadores[_barra_index];
+
+    _icone_multiplicador_atual = lerp(
+        _icone_multiplicador_atual,
+        _icone_multiplicador_alvo,
+        0.1
+    );
+
+    if (abs(_icone_multiplicador_atual - _icone_multiplicador_alvo) < 0.001) {
+        _icone_multiplicador_atual = _icone_multiplicador_alvo;
+    }
+
+    partida_icone_multiplicadores[_barra_index] =
+        _icone_multiplicador_atual;
+
+    var _icone_escala_final =
+        _icone_escala * _icone_multiplicador_atual;
+
+    var _icone_largura_final =
+        _icone_largura * _icone_escala_final;
+
+    var _icone_altura_final =
+        _icone_altura * _icone_escala_final;
+
+    var _icone_escala_x = _icone_escala_final;
+
+    if (_barra_index == 1 || _barra_index == 3) {
+        _icone_escala_x = -_icone_escala_final;
+    }
+
+    var _icone_margem = 12;
+
+    var _icone_x;
+    var _icone_y;
+
+    switch (_barra_index) {
+
+        case 0:
+            _icone_x = _barra_x - 200 + _barra_largura * 0.55;
+            _icone_y = _barra_y + 100;
+        break;
+
+        case 1:
+            _icone_x = _barra_x + 200 + _barra_largura * 0.45;
+            _icone_y = _barra_y + 100;
+        break;
+
+        case 2:
+            _icone_x = _barra_x - 200 + _barra_largura * 0.55;
+            _icone_y = _barra_y + _barra_altura - _icone_altura_final - 134;
+        break;
+
+        case 3:
+            _icone_x = _barra_x + 200 + _barra_largura * 0.45;
+            _icone_y = _barra_y + _barra_altura - _icone_altura_final - 134;
+        break;
+    }
+
+    // --------------------------------------------------
+    // ANIMAÇÃO DO SPR_BARRA_BACK
+    // SOMENTE JOGADORES VERMELHO E VERDE
+    // --------------------------------------------------
+
+    if (_barra_index == 0 || _barra_index == 1) {
+
+        var _back_index = _barra_index;
+
+        var _back_alvo_x = 0;
+        var _back_alvo_y = 0;
+
+        var _back_recuo_x = _barra_largura * 0.2;
+        var _back_recuo_y = _barra_altura * 0.2;
+
+        if (_icone_e_turno) {
+
+            var _icone_esquerda = _icone_x;
+
+            if (_barra_index == 1) {
+                _icone_esquerda -= _icone_largura_final;
+            }
+
+            var _back_distancia_x = abs(_icone_esquerda - _barra_x);
+
+            if (_barra_index == 0) {
+                _back_alvo_x = _back_distancia_x * 0.002;
+            }
+            else {
+                _back_alvo_x = -_back_distancia_x * 0.002;
+            }
+
+            _back_alvo_y = (_icone_y - _barra_y) * 0.01;
+        }
+        else {
+
+            if (_barra_index == 0) {
+                _back_alvo_x = -_back_recuo_x;
+            }
+            else {
+                _back_alvo_x = _back_recuo_x;
+            }
+
+            _back_alvo_y = -_back_recuo_y;
+        }
+
+        partida_barra_back_desloc_x[_back_index] = lerp(
+            partida_barra_back_desloc_x[_back_index],
+            _back_alvo_x,
+            0.2
+        );
+
+        partida_barra_back_desloc_y[_back_index] = lerp(
+            partida_barra_back_desloc_y[_back_index],
+            _back_alvo_y,
+            0.2
+        );
+
+        if (abs(partida_barra_back_desloc_x[_back_index] - _back_alvo_x) < 0.1) {
+            partida_barra_back_desloc_x[_back_index] = _back_alvo_x;
+        }
+
+        if (abs(partida_barra_back_desloc_y[_back_index] - _back_alvo_y) < 0.1) {
+            partida_barra_back_desloc_y[_back_index] = _back_alvo_y;
+        }
+
+        draw_sprite_ext(
+            spr_barra_back,
+            _barra_index,
+            _barra_x + partida_barra_back_desloc_x[_back_index],
+            _barra_y + partida_barra_back_desloc_y[_back_index],
+            _barra_escala,
+            _barra_escala,
+            0,
+            c_white,
+            1
+        );
+    }
+
+
+    // --------------------------------------------------
+    // DESENHAR FOTO DA STEAM
+    // DEPOIS DO SPR_BARRA_BACK
+    // ANTES DO SPR_BARRA
+    // --------------------------------------------------
+
+    var _avatar_hud = instance_find(
+        obj_partida_steam_avatars,
+        0
+    );
+	
+    if (_avatar_hud != noone) {
+	gpu_set_texfilter(true);
+        _avatar_hud.avatar_desenhar(
+            _session_id_jogador,
+            _barra_index,
+            _barra_x,
+            _barra_y,
+            _barra_largura,
+            _barra_altura
+        );
+    
+	gpu_set_texfilter(false);
+	}
+
+    // --------------------------------------------------
+    // DESENHAR BARRA NORMAL
+    // POR CIMA DA FOTO DA STEAM
+    // --------------------------------------------------
+
+    draw_sprite_ext(
+        spr_barra,
+        _barra_index,
+        _barra_x,
+        _barra_y,
+        _barra_escala,
+        _barra_escala,
+        0,
+        c_white,
+        1
+    );
+
+
+    // --------------------------------------------------
+    // DESENHAR ÍCONE ORIGINAL
+    // --------------------------------------------------
+
+    draw_sprite_ext(
+        _icone_jogador,
+        0,
+        _icone_x,
+        _icone_y,
+        _icone_escala_x,
+        _icone_escala_final,
+        0,
+        c_white,
+        1
+    );
+
+    // --------------------------------------------------
+    // CÓPIA ESCURECIDA DO ÍCONE
+    // --------------------------------------------------
+
+    var _icone_alpha_escuro = 0.5;
+
+    if (_icone_e_turno) {
+        _icone_alpha_escuro = 0;
+    }
+
+    if (_icone_alpha_escuro > 0) {
+
+        draw_sprite_ext(
+            _icone_jogador,
+            0,
+            _icone_x,
+            _icone_y,
+            _icone_escala_x,
+            _icone_escala_final,
+            0,
+            c_black,
+            _icone_alpha_escuro
+        );
+    }
+
+    // --------------------------------------------------
+    // POSICIONAMENTO DO NOME
+    // --------------------------------------------------
+
+    var tx;
+    var ty;
+
+    if (_barra_index == 0 || _barra_index == 2) {
+        tx = 85;
+    }
+    else {
+        tx = -85;
+    }
+
+    if (_barra_index <= 1) {
+        ty = -30;
+    }
+    else {
+        ty = -15;
+    }
+
+    var _texto_x = tx + _barra_x + _barra_largura / 2;
+    var _texto_y = ty + _barra_y + _barra_altura / 2;
+
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+
+    var color_text_bar = [
+        make_colour_rgb(36,21,39),
+        make_colour_rgb(25,51,45),
+        make_colour_rgb(52,28,39),
+        make_colour_rgb(23,32,56)
+    ];
+
+    draw_set_color(c_white);
+    draw_set_font(fnt_pixelari);
+
+    draw_text_transformed_contour(
+        _texto_x,
+        _texto_y,
+        _nome_jogador,
+        .2,
+        .2,
+        0,
+        4,
+        c_white,
+        color_text_bar[_barra_index]
+    );
+
+    var _mx;
+    var _my;
+
+    if (_barra_index == 0) {
+        _mx = 10;
+        _my = 50;
+    }
+    else if (_barra_index == 1) {
+        _mx = -10;
+        _my = 50;
+    }
+    else if (_barra_index == 2) {
+        _mx = 10;
+        _my = 55;
+    }
+    else if (_barra_index == 3) {
+        _mx = 0;
+        _my = 55;
+    }
+
+    // Dinheiro do jogador.
+    var _texto_dinheiro = partida_formatar_dinheiro(_dinheiro_jogador);
+
+    draw_text_transformed_contour(
+        _texto_x + _mx,
+        _texto_y + _my,
+        _texto_dinheiro,
+        .16,
+        .16,
+        0,
+        3,
+        c_white,
+        color_text_bar[_barra_index]
+    );
+
+    // --------------------------------------------------
+    // ANIMAÇÃO DE GANHO/PERDA DE DINHEIRO
+    // --------------------------------------------------
+
+    for (
+        var _ganho_index = 0;
+        _ganho_index < array_length(partida_dinheiro_animacoes);
+        _ganho_index++
+    ) {
+
+        var _ganho = partida_dinheiro_animacoes[_ganho_index];
+
+        if (
+            _ganho.session_id == _session_id_jogador &&
+            _ganho.start_ms >= 0 &&
+            !partida_popup_ativo
+        ) {
+
+            var _tempo_ganho = current_time - _ganho.start_ms;
+
+            var _alpha_ganho = 1;
+
+            if (_tempo_ganho > 1000) {
+                _alpha_ganho = 1 - ((_tempo_ganho - 1000) / 1000);
+            }
+
+            _alpha_ganho = clamp(_alpha_ganho, 0, 1);
+
+            var _direcao_ganho = 1;
+
+            if (_barra_index >= 2) {
+                _direcao_ganho = -1;
+            }
+
+            var _movimento_ganho = (_tempo_ganho / 2000) * 35;
+
+            var _offset_ganho_y = -30;
+
+            if (_barra_index <= 1) {
+                _offset_ganho_y = 5;
+            }
+
+            var _ganho_x = _texto_x + _mx;
+
+            var _ganho_y =
+                _texto_y + _my + _offset_ganho_y +
+                (_movimento_ganho * _direcao_ganho);
+
+            var _sinal_dinheiro = "+";
+
+            if (_ganho.negative) {
+                _sinal_dinheiro = "-";
+            }
+
+            var _texto_ganho =
+                _sinal_dinheiro +
+                partida_formatar_dinheiro(_ganho.amount);
+
+            draw_set_alpha(_alpha_ganho);
+            draw_set_font(fnt_pixelari);
+            draw_set_halign(fa_center);
+            draw_set_valign(fa_middle);
+
+            draw_text_transformed_contour(
+                _ganho_x,
+                _ganho_y,
+                _texto_ganho,
+                .16,
+                .16,
+                0,
+                3,
+                c_white,
+                color_text_bar[_barra_index]
+            );
+
+            draw_set_alpha(1);
+        }
+    }
+}
+
+// --------------------------------------------------
+// INFORMAÇÃO DO TURNO
+// --------------------------------------------------
+
+draw_set_halign(fa_center);
+draw_set_valign(fa_middle);
+
+var _turn_text = "Aguardando jogadores";
+
+for (var _i = 0; _i < array_length(partida_jogadores); _i++) {
+
+    if (
+        partida_jogadores[_i].session_id ==
+        partida_turno_atual
+    ) {
+
+        _turn_text = "Turno de: " + partida_jogadores[_i].name;
+        break;
+    }
+}
+
+draw_set_font(fnt_pixelari);
+
+draw_text_transformed_contour(
+    _gui_w / 2,
+    42,
+    _turn_text,
+    .2,.2,
+    0,
+    4,
+    c_white,
+    make_colour_rgb(16,20,31)
+);
+
+draw_set_font(-1);
+
+// --------------------------------------------------
+// ELEMENTOS DA PARTIDA
+// OCULTAR DURANTE OS POPUPS E MENU DA PRISÃO
+// --------------------------------------------------
+
+if (!partida_popup_ativo && !partida_prisao_menu_ativo) {
+
+    // --------------------------------------------------
+    // RESULTADO DOS DADOS
+    // --------------------------------------------------
+
+    if (
+        partida_tem_rolagem &&
+        (
+            !partida_jogador_preso ||
+            partida_prisao_tentativa_em_andamento
+        )
+    ) {
+
+        var _contador_escala = partida_escala_dados;
+
+        var _contador_largura =
+            sprite_get_width(spr_dado_contador) * _contador_escala;
+
+        var _contador_altura =
+            sprite_get_height(spr_dado_contador) * _contador_escala;
+
+        var _contador_espacamento = partida_espacamento_dados;
+
+        var _contador_grupo_largura =
+            (_contador_largura * 2) +
+            _contador_espacamento;
+
+        var _contador_x =
+            (_gui_w - _contador_grupo_largura) / 2;
+
+        var _contador_y =
+            _gui_h / 2 - _contador_altura / 2 + 35;
+
+        draw_sprite_ext(
+            spr_dado_contador,
+            partida_dado1 - 1,
+            _contador_x + sprite_get_xoffset(spr_dado_contador) * _contador_escala,
+            _contador_y + sprite_get_yoffset(spr_dado_contador) * _contador_escala,
+            _contador_escala,
+            _contador_escala,
+            0,
+            c_white,
+            1
+        );
+
+        var _contador_direita_x =
+            _contador_x +
+            _contador_largura +
+            _contador_espacamento;
+
+        draw_sprite_ext(
+            spr_dado_contador,
+            partida_dado2 - 1,
+            _contador_direita_x + sprite_get_xoffset(spr_dado_contador) * _contador_escala,
+            _contador_y + sprite_get_yoffset(spr_dado_contador) * _contador_escala,
+            _contador_escala,
+            _contador_escala,
+            0,
+            c_white,
+            1
+        );
+
+        // --------------------------------------------------
+        // NÚMERO ANIMADO DO RESULTADO
+        // --------------------------------------------------
+
+        var _valor_contador = partida_contador_resultado;
+
+        if (partida_contador_ativo) {
+            _valor_contador = partida_contador_valor;
+        }
+
+        draw_set_font(fnt_pixelari);
+        draw_set_halign(fa_center);
+        draw_set_valign(fa_middle);
+
+        draw_text_transformed_contour(
+            _gui_w / 2,
+            _contador_y - 35,
+            string(_valor_contador),
+            0.35,
+            0.35,
+            0,
+            4,
+            c_white,
+            make_colour_rgb(16,20,31)
+        );
+
+        draw_set_font(-1);
+    }
+
+    // --------------------------------------------------
+    // DESENHAR OS DOIS DADOS ANIMADOS
+    // --------------------------------------------------
+
+    if (partida_dados_visiveis) {
+
+        var _escala = partida_escala_dados;
+
+        var _dado_largura = sprite_get_width(spr_dado1) * _escala;
+        var _dado_altura = sprite_get_height(spr_dado1) * _escala;
+
+        var _grupo_largura =
+            (_dado_largura * 2) +
+            partida_espacamento_dados;
+
+        var _dados_x = (_gui_w - _grupo_largura) / 2;
+        var _dados_y = (_gui_h - _dado_altura) / 2;
+
+        var _indice_dados = partida_dados_indice_animacao;
+        var _angulo_dados = partida_dados_angulo;
+
+        draw_sprite_ext(
+            spr_dado1,
+            _indice_dados,
+            _dados_x + sprite_get_xoffset(spr_dado1) * _escala,
+            _dados_y + sprite_get_yoffset(spr_dado1) * _escala,
+            _escala,
+            _escala,
+            _angulo_dados,
+            c_white,
+            1
+        );
+
+        var _direita_x =
+            _dados_x +
+            _dado_largura +
+            partida_espacamento_dados;
+
+        draw_sprite_ext(
+            spr_dado2,
+            _indice_dados,
+            _direita_x + sprite_get_xoffset(spr_dado2) * _escala,
+            _dados_y + sprite_get_yoffset(spr_dado2) * _escala,
+            _escala,
+            _escala,
+            _angulo_dados,
+            c_white,
+            1
+        );
+    }
+
+    // --------------------------------------------------
+    // BOTÃO PRINCIPAL — ENCERRAR TURNO
+    // --------------------------------------------------
+
+    var _button_x1 = _gui_w / 2 - 150;
+    var _button_y1 = _gui_h - 115;
+
+    var _button_x2 = _gui_w / 2 + 150;
+    var _button_y2 = _gui_h - 45;
+
+    if (partida_botao_ativo) {
+        draw_set_color(make_color_rgb(45, 120, 65));
+    }
+    else {
+        draw_set_color(make_color_rgb(65, 65, 65));
+    }
+
+    draw_roundrect(
+        _button_x1,
+        _button_y1,
+        _button_x2,
+        _button_y2,
+        false
+    );
+
+    draw_set_color(c_white);
+
+    if (
+        partida_contagem_rolagem >= 0 &&
+        partida_e_meu_turno &&
+        !partida_tem_rolagem &&
+        !partida_rolagem_solicitada
+    ) {
+
+        draw_text(
+            _gui_w / 2,
+            (_button_y1 + _button_y2) / 2 - 12,
+            partida_botao_texto
+        );
+
+        draw_set_color(c_yellow);
+
+        draw_text(
+            _gui_w / 2,
+            (_button_y1 + _button_y2) / 2 + 13,
+            string(partida_contagem_rolagem)
+        );
+
+    }
+    else {
+
+        draw_text(
+            _gui_w / 2,
+            (_button_y1 + _button_y2) / 2,
+            partida_botao_texto
+        );
+    }
+}
+
+// --------------------------------------------------
+// POPUP DO PRIMEIRO JOGADOR
+// --------------------------------------------------
+
+if (partida_mostrar_primeiro_jogador) {
+
+    var _popup_centro_x = _gui_w / 2;
+    var _popup_centro_y = _gui_h / 2;
+
+    var _popup_escala = 4;
+
+    var _popup_largura =
+        sprite_get_width(spr_msg) * _popup_escala;
+
+    var _popup_altura =
+        sprite_get_height(spr_msg) * _popup_escala;
+
+    draw_sprite_ext(
+        spr_msg,
+        0,
+        _popup_centro_x,
+        _popup_centro_y,
+        _popup_escala,
+        _popup_escala,
+        0,
+        c_white,
+        1
+    );
+
+    var _popup_icone = -1;
+
+    for (
+        var _popup_index = 0;
+        _popup_index < array_length(partida_jogadores);
+        _popup_index++
+    ) {
+
+        if (
+            partida_jogadores[_popup_index].session_id ==
+            partida_primeiro_jogador_session_id
+        ) {
+
+            _popup_icone = partida_jogadores[_popup_index].icon;
+            break;
+        }
+    }
+
+    var _texto_primeiro_jogador = "";
+
+    if (
+        partida_primeiro_jogador_session_id ==
+        _meu_session_id
+    ) {
+
+        _texto_primeiro_jogador =
+            "Voce comecara a partida!";
+
+    }
+    else {
+
+        _texto_primeiro_jogador =
+            partida_primeiro_jogador_nome +
+            "\ncomecara a partida!";
+
+    }
+
+    draw_set_font(fnt_pixelari);
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+
+    draw_text_transformed_contour(
+        _popup_centro_x,
+        _popup_centro_y - _popup_altura * 0.3,
+        _texto_primeiro_jogador,
+        0.25,
+        0.25,
+        0,
+        4,
+        c_white,
+        make_colour_rgb(16,20,31)
+    );
+
+    if (_popup_icone != -1) {
+
+        var _popup_icone_largura = sprite_get_width(_popup_icone);
+        var _popup_icone_altura = sprite_get_height(_popup_icone);
+
+        var _popup_icone_escala = min(
+            (_popup_largura * 0.25) / _popup_icone_largura,
+            (_popup_altura * 0.28) / _popup_icone_altura
+        ) * 2.4;
+
+        var _popup_icone_largura_final =
+            _popup_icone_largura * _popup_icone_escala;
+
+        var _popup_icone_altura_final =
+            _popup_icone_altura * _popup_icone_escala;
+
+        var _popup_icone_x =
+            _popup_centro_x - _popup_icone_largura_final / 2;
+
+        var _popup_icone_y =
+            _popup_centro_y + _popup_altura * 0.06;
+
+        draw_sprite_ext(
+            _popup_icone,
+            0,
+            _popup_icone_x,
+            _popup_icone_y-100,
+            _popup_icone_escala,
+            _popup_icone_escala,
+            0,
+            c_white,
+            1
+        );
+    }
+}
+
+// --------------------------------------------------
+// POPUP DA ROLAGEM EXTRA
+// --------------------------------------------------
+
+if (partida_mostrar_rolagem_extra) {
+
+    var _extra_popup_centro_x = _gui_w / 2;
+    var _extra_popup_centro_y = _gui_h / 2;
+
+    var _extra_popup_escala = 4;
+
+    var _extra_popup_largura =
+        sprite_get_width(spr_msg) * _extra_popup_escala;
+
+    var _extra_popup_altura =
+        sprite_get_height(spr_msg) * _extra_popup_escala;
+
+    draw_sprite_ext(
+        spr_msg,
+        0,
+        _extra_popup_centro_x,
+        _extra_popup_centro_y,
+        _extra_popup_escala,
+        _extra_popup_escala,
+        0,
+        c_white,
+        1
+    );
+
+    var _extra_popup_icone = -1;
+
+    for (
+        var _extra_popup_index = 0;
+        _extra_popup_index < array_length(partida_jogadores);
+        _extra_popup_index++
+    ) {
+
+        if (
+            partida_jogadores[_extra_popup_index].session_id ==
+            partida_rolagem_extra_session_id
+        ) {
+
+            _extra_popup_icone =
+                partida_jogadores[_extra_popup_index].icon;
+
+            break;
+        }
+    }
+
+    var _texto_motivo_extra = "";
+
+    if (partida_rolagem_extra_motivo == "start") {
+        _texto_motivo_extra = "Bem vindo ao inicio";
+    }
+    else if (partida_rolagem_extra_motivo == "doubles") {
+        _texto_motivo_extra = "Duplas";
+    }
+
+    var _texto_rolagem_extra = "";
+
+    if (
+        partida_rolagem_extra_session_id ==
+        _meu_session_id
+    ) {
+
+        _texto_rolagem_extra =
+            _texto_motivo_extra +
+            "\nvoce ganhou uma \nrolagem de dados extra";
+
+    }
+    else {
+
+        _texto_rolagem_extra =
+            _texto_motivo_extra +
+            "\n" +
+            partida_rolagem_extra_nome +
+            " ganhou uma \nrolagem de dados extra";
+
+    }
+
+    draw_set_font(fnt_pixelari);
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+
+    draw_text_transformed_contour(
+        _extra_popup_centro_x,
+        _extra_popup_centro_y - _extra_popup_altura * 0.3,
+        _texto_rolagem_extra,
+        0.22,
+        0.22,
+        0,
+        4,
+        c_white,
+        make_colour_rgb(16,20,31)
+    );
+
+    // --------------------------------------------------
+    // DADOS AO LADO DO TEXTO DO POPUP DE ROLAGEM EXTRA
+    // --------------------------------------------------
+
+    if (
+        partida_rolagem_extra_motivo == "doubles" &&
+        partida_dado1 >= 1 &&
+        partida_dado1 <= 6 &&
+        partida_dado2 >= 1 &&
+        partida_dado2 <= 6
+    ) {
+
+        var _escala_dados_popup = 1.9;
+
+        var _dados_popup_y =
+            _extra_popup_centro_y - _extra_popup_altura * 0.12;
+
+        var _distancia_dados_popup = 90;
+
+        draw_sprite_ext(
+            spr_dado_contador,
+            partida_dado1 - 1,
+            _extra_popup_centro_x - _distancia_dados_popup - 20,
+            _dados_popup_y - 140,
+            _escala_dados_popup,
+            _escala_dados_popup,
+            0,
+            c_white,
+            1
+        );
+
+        draw_sprite_ext(
+            spr_dado_contador,
+            partida_dado2 - 1,
+            _extra_popup_centro_x + _distancia_dados_popup - 20,
+            _dados_popup_y - 140,
+            _escala_dados_popup,
+            _escala_dados_popup,
+            0,
+            c_white,
+            1
+        );
+    }
+
+    // --------------------------------------------------
+    // ÍCONE DO JOGADOR PREMIADO
+    // --------------------------------------------------
+
+    if (_extra_popup_icone != -1) {
+
+        var _extra_icone_largura =
+            sprite_get_width(_extra_popup_icone);
+
+        var _extra_icone_altura =
+            sprite_get_height(_extra_popup_icone);
+
+        var _extra_icone_escala = min(
+            (_extra_popup_largura * 0.25) / _extra_icone_largura,
+            (_extra_popup_altura * 0.28) / _extra_icone_altura
+        ) * 2.4;
+
+        var _extra_icone_largura_final =
+            _extra_icone_largura * _extra_icone_escala;
+
+        var _extra_icone_x =
+            _extra_popup_centro_x - _extra_icone_largura_final / 2;
+
+        var _extra_icone_y =
+            _extra_popup_centro_y + _extra_popup_altura * 0.06;
+
+        draw_sprite_ext(
+            _extra_popup_icone,
+            0,
+            _extra_icone_x,
+            _extra_icone_y - 100,
+            _extra_icone_escala,
+            _extra_icone_escala,
+            0,
+            c_white,
+            1
+        );
+    }
+}
+
+
+// --------------------------------------------------
+// POPUP DE ANÚNCIO DA PRISÃO
+// --------------------------------------------------
+
+if (partida_mostrar_prisao) {
+
+    var _prison_popup_center_x = _gui_w / 2;
+    var _prison_popup_center_y = _gui_h / 2;
+
+    var _prison_popup_scale = 4;
+
+    var _prison_popup_width =
+        sprite_get_width(spr_msg) * _prison_popup_scale;
+
+    var _prison_popup_height =
+        sprite_get_height(spr_msg) * _prison_popup_scale;
+
+    // --------------------------------------------------
+    // FUNDO DO POPUP
+    // --------------------------------------------------
+
+    draw_sprite_ext(
+        spr_msg,
+        0,
+        _prison_popup_center_x,
+        _prison_popup_center_y,
+        _prison_popup_scale,
+        _prison_popup_scale,
+        0,
+        c_white,
+        1
+    );
+
+    // --------------------------------------------------
+    // IDENTIFICAR ÍCONE DO JOGADOR
+    // --------------------------------------------------
+
+    var _prison_popup_icon = -1;
+
+    for (
+        var _prison_icon_index = 0;
+        _prison_icon_index < array_length(partida_jogadores);
+        _prison_icon_index++
+    ) {
+
+        if (
+            partida_jogadores[_prison_icon_index].session_id ==
+            partida_prisao_session_id
+        ) {
+
+            _prison_popup_icon =
+                partida_jogadores[_prison_icon_index].icon;
+
+            break;
+        }
+    }
+
+    // --------------------------------------------------
+    // DEFINIR TEXTO DO POPUP
+    // --------------------------------------------------
+
+    var _prison_popup_text = "";
+
+    if (partida_prisao_motivo == "triple_doubles") {
+
+        _prison_popup_text =
+            "Voce fez 3 duplas\n" +
+            "seguidas va para\n" +
+            "prisao";
+
+    }
+    else if (partida_prisao_session_id == _meu_session_id) {
+
+        _prison_popup_text = "Voce foi preso!!!";
+
+    }
+    else {
+
+        _prison_popup_text =
+            partida_prisao_nome +
+            "\ncaiu na prisao!!!";
+    }
+
+    // --------------------------------------------------
+    // DESENHAR TEXTO
+    // --------------------------------------------------
+
+    draw_set_font(fnt_pixelari);
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+
+    draw_text_transformed_contour(
+        _prison_popup_center_x,
+        _prison_popup_center_y - _prison_popup_height * 0.3,
+        _prison_popup_text,
+        0.25,
+        0.25,
+        0,
+        4,
+        c_white,
+        make_colour_rgb(16, 20, 31)
+    );
+
+    // --------------------------------------------------
+    // DESENHAR ÍCONE
+    // --------------------------------------------------
+
+    if (_prison_popup_icon != -1) {
+
+        var _prison_icon_width =
+            sprite_get_width(_prison_popup_icon);
+
+        var _prison_icon_height =
+            sprite_get_height(_prison_popup_icon);
+
+        var _prison_icon_scale = min(
+            (_prison_popup_width * 0.25) / _prison_icon_width,
+            (_prison_popup_height * 0.28) / _prison_icon_height
+        ) * 2.4;
+
+        var _prison_icon_width_final =
+            _prison_icon_width * _prison_icon_scale;
+
+        var _prison_icon_x =
+            _prison_popup_center_x -
+            _prison_icon_width_final / 2;
+
+        var _prison_icon_y =
+            _prison_popup_center_y +
+            _prison_popup_height * 0.06;
+
+        draw_sprite_ext(
+            _prison_popup_icon,
+            0,
+            _prison_icon_x,
+            _prison_icon_y - 100,
+            _prison_icon_scale,
+            _prison_icon_scale,
+            0,
+            c_white,
+            1
+        );
+    }
+}
+
+
+// --------------------------------------------------
+// MENU DA PRISÃO
+// --------------------------------------------------
+
+if (partida_prisao_menu_ativo) {
+
+    var _prison_menu_center_x = _gui_w / 2;
+    var _prison_menu_center_y = _gui_h / 2;
+
+    var _prison_menu_scale = 4;
+
+    var _prison_menu_width =
+        sprite_get_width(spr_msg) * _prison_menu_scale;
+
+    var _prison_menu_height =
+        sprite_get_height(spr_msg) * _prison_menu_scale;
+
+    draw_sprite_ext(
+        spr_msg,
+        0,
+        _prison_menu_center_x,
+        _prison_menu_center_y,
+        _prison_menu_scale,
+        _prison_menu_scale,
+        0,
+        c_white,
+        1
+    );
+
+    // Título.
+    draw_set_font(fnt_pixelari);
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+
+    draw_text_transformed_contour(
+        _prison_menu_center_x,
+        _prison_menu_center_y - _prison_menu_height * 0.32,
+        "PRISAO",
+        0.35,
+        0.35,
+        0,
+        4,
+        c_white,
+        make_colour_rgb(16,20,31)
+    );
+
+    // --------------------------------------------------
+    // BOTÕES DA PRISÃO
+    // --------------------------------------------------
+
+    var _prison_button_scale = 2.5;
+
+    var _prison_button_width =
+        sprite_get_width(spr_botao2) * _prison_button_scale;
+
+    var _prison_button_height =
+        sprite_get_height(spr_botao2) * _prison_button_scale;
+
+    var _prison_button_center_y =
+        _prison_menu_center_y + 10;
+
+    var _prison_button_texts = [
+        "tentar duplas",
+        "Pagar 200k",
+        "cobrar divida"
+    ];
+
+    // Posição atual do mouse na GUI.
+    var _prison_mouse_x = device_mouse_x_to_gui(0);
+    var _prison_mouse_y = device_mouse_y_to_gui(0);
+
+    for (
+        var _prison_button_index = 0;
+        _prison_button_index < 3;
+        _prison_button_index++
+    ) {
+
+        var _prison_button_x = _prison_menu_center_x;
+
+        var _prison_button_y =
+            _prison_button_center_y +
+            ((_prison_button_index - 1) * _prison_button_height * 1.5);
+
+        var _prison_button_alpha = 1;
+
+        if (partida_prisao_acao_solicitada) {
+            _prison_button_alpha = 0.55;
+        }
+
+        if (
+            _prison_button_index == 2 &&
+            partida_dividas_disponiveis <= 0
+        ) {
+            _prison_button_alpha = 0.35;
+        }
+
+        // Verificar se o mouse está sobre o botão.
+        var _prison_button_hover =
+            point_in_rectangle(
+                _prison_mouse_x,
+                _prison_mouse_y,
+                _prison_button_x - _prison_button_width / 2,
+                _prison_button_y - _prison_button_height / 2,
+                _prison_button_x + _prison_button_width / 2,
+                _prison_button_y + _prison_button_height / 2
+            );
+
+        var _prison_button_sprite_index = 0;
+
+        if (_prison_button_hover) {
+            _prison_button_sprite_index = 1;
+        }
+
+        draw_sprite_ext(
+            spr_botao2,
+            _prison_button_sprite_index,
+            _prison_button_x,
+            _prison_button_y,
+            _prison_button_scale,
+            _prison_button_scale,
+            0,
+            c_white,
+            _prison_button_alpha
+        );
+
+        draw_set_alpha(_prison_button_alpha);
+        draw_set_font(fnt_pixelari);
+        draw_set_halign(fa_center);
+        draw_set_valign(fa_middle);
+
+        draw_text_transformed_contour(
+            _prison_button_x,
+            _prison_button_y,
+            _prison_button_texts[_prison_button_index],
+            0.19,
+            0.19,
+            0,
+            3,
+            c_white,
+            make_colour_rgb(16,20,31)
+        );
+
+        draw_set_alpha(1);
+    }
+}
+
+// --------------------------------------------------
+// RESTAURAR CONFIGURAÇÕES DE DESENHO
+// --------------------------------------------------
+
+draw_set_alpha(1);
+draw_set_halign(fa_left);
+draw_set_valign(fa_top);
+draw_set_color(c_white);
+draw_set_font(-1);"
