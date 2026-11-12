@@ -223,6 +223,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
 
 
+
     // --------------------------------------------------
     // VERIFICAR SE TODOS OS CLIENTES CHEGARAM
     // --------------------------------------------------
@@ -260,22 +261,34 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             `Todos os jogadores confirmaram a chegada de ${pending.sessionId}.`
         );
 
+        // --------------------------------------------------
+        // PRISÃO NORMAL
+        // --------------------------------------------------
+
         if (pending.type === "prison") {
 
             this.showPrisonAnnouncement(pending.sessionId);
-
         }
+
+        // --------------------------------------------------
+        // TERCEIRA DUPLA CONSECUTIVA
+        // --------------------------------------------------
+
         else if (pending.type === "triple_prison") {
 
-            // Terceira dupla:
-            // jogador já está preso e chegou à casa 8.
-            // Encerrar seu turno imediatamente.
-
             if (this.state.currentTurn === pending.sessionId) {
-                this.nextTurn();
-            }
 
+                // Exibir o popup somente depois da chegada.
+                this.showTripleDoublesAnnouncement(
+                    pending.sessionId
+                );
+            }
         }
+
+        // --------------------------------------------------
+        // ROLAGEM EXTRA
+        // --------------------------------------------------
+
         else if (pending.type === "extra" && pending.reason) {
 
             this.showExtraRollAnnouncement(
@@ -284,6 +297,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             );
         }
     }
+
 
 
     // --------------------------------------------------
@@ -508,6 +522,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         }, FIRST_PLAYER_MESSAGE_DURATION);
     }
 
+ 
     // --------------------------------------------------
     // POPUP: TRÊS DUPLAS CONSECUTIVAS
     // --------------------------------------------------
@@ -527,6 +542,11 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
         this.state.turnDeadline = 0;
 
+        // A prisão passa a valer após o personagem chegar.
+        player.inPrison = true;
+        player.prisonAttempts = 0;
+        player.extraRollAvailable = false;
+
         this.state.prisonPlayerSessionId = sessionId;
         this.state.prisonPlayerName = player.name;
         this.state.prisonMessageReason = "triple_doubles";
@@ -534,7 +554,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         this.state.showPrisonMessage = true;
 
         console.log(
-            `Exibindo popup de três duplas para ${player.name}.`
+            `Exibindo popup de três duplas para ${player.name} após a chegada.`
         );
 
         this.prisonMessageDelay = this.clock.setTimeout(() => {
@@ -550,20 +570,30 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                 return;
             }
 
-            // Não troca o turno aqui.
-            // Agora a animação pode caminhar até a casa 8.
-            // A troca acontece quando todos confirmarem
-            // que a animação terminou.
+            // Encerrar o turno somente após o popup.
+            if (
+                this.state.currentTurn === sessionId &&
+                this.state.players.has(sessionId)
+            ) {
+
+                console.log(
+                    `Popup de três duplas encerrado. Passando o turno de ${player.name}.`
+                );
+
+                this.nextTurn();
+            }
 
         }, TRIPLE_DOUBLES_MESSAGE_DURATION);
     }
 
 
+ 
     // --------------------------------------------------
     // EXIBIR ANÚNCIO DE PRISÃO
     // --------------------------------------------------
 
     private showPrisonAnnouncement(sessionId: string) {
+
         const player = this.state.players.get(sessionId);
 
         if (!player) {
@@ -577,6 +607,18 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
         this.state.turnDeadline = 0;
 
+        // --------------------------------------------------
+        // FINALIZAR RESULTADO E ATIVAR PRISÃO
+        // --------------------------------------------------
+
+        player.inPrison = true;
+
+        this.state.hasRolled = false;
+        this.state.lastRollBy = "";
+
+        // Os valores dos dados não são apagados aqui.
+        // O próximo turno já possui sua própria limpeza.
+
         this.state.prisonPlayerSessionId = sessionId;
         this.state.prisonPlayerName = player.name;
         this.state.showPrisonMessage = true;
@@ -588,6 +630,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         console.log("==================================");
 
         this.prisonMessageDelay = this.clock.setTimeout(() => {
+
             this.prisonMessageDelay = undefined;
 
             if (this.state.status !== "playing") {
@@ -608,8 +651,10 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             ) {
                 this.nextTurn();
             }
+
         }, PRISON_MESSAGE_DURATION);
     }
+
 
     // --------------------------------------------------
     // INICIAR PRAZO DA ROLAGEM EXTRA
@@ -661,6 +706,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
 
  
+
     // --------------------------------------------------
     // EXIBIR ANÚNCIO DA ROLAGEM EXTRA
     // --------------------------------------------------
@@ -669,6 +715,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         sessionId: string,
         reason: ExtraRollReason
     ) {
+
         const player = this.state.players.get(sessionId);
 
         if (!player) {
@@ -679,7 +726,18 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
         this.turnTimeout?.clear();
         this.turnTimeout = undefined;
+
         this.state.turnDeadline = 0;
+
+        // --------------------------------------------------
+        // FINALIZAR ROLAGEM ANTERIOR APÓS A CHEGADA
+        // --------------------------------------------------
+
+        this.state.hasRolled = false;
+        this.state.lastRollBy = "";
+
+        // Preservar dice1 e dice2 para o popup de duplas.
+        // Somente uma nova rolagem substituirá esses valores.
 
         this.state.extraRollPlayerSessionId = sessionId;
         this.state.extraRollPlayerName = player.name;
@@ -697,6 +755,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         console.log("==================================");
 
         this.extraRollMessageDelay = this.clock.setTimeout(() => {
+
             this.extraRollMessageDelay = undefined;
 
             if (this.state.status !== "playing") {
@@ -708,24 +767,15 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             this.state.extraRollPlayerSessionId = "";
             this.state.extraRollReason = "";
 
-            // --------------------------------------------------
-            // PRESERVAR O RESULTADO ANTERIOR DOS DADOS
-            // --------------------------------------------------
-
-            // Não zerar dice1 e dice2 neste momento.
-            // Os valores anteriores permanecem sincronizados
-            // até o jogador realizar uma nova rolagem.
-            //
-            // A próxima chamada de roll_dice atualizará ambos
-            // com os novos resultados normalmente.
-
             console.log(
                 "Popup da rolagem extra encerrado. Liberando a partida."
             );
 
             this.startExtraRollTimer(sessionId);
+
         }, EXTRA_ROLL_MESSAGE_DURATION);
     }
+
 
 
 
@@ -1051,6 +1101,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         },
 
 
+
         // --------------------------------------------------
         // ROLAR DADOS NORMALMENTE
         // --------------------------------------------------
@@ -1058,10 +1109,12 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         roll_dice: (client: Client) => {
 
             if (this.state.status !== "playing") {
+
                 client.send(
                     "action_error",
                     "A partida ainda não começou."
                 );
+
                 return;
             }
 
@@ -1070,46 +1123,62 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             }
 
             if (this.state.currentTurn !== client.sessionId) {
-                client.send("action_error", "Não é seu turno.");
+
+                client.send(
+                    "action_error",
+                    "Não é seu turno."
+                );
+
                 return;
             }
 
-            const player = this.state.players.get(client.sessionId);
+            const player = this.state.players.get(
+                client.sessionId
+            );
 
             if (!player) {
                 return;
             }
 
             if (player.inPrison) {
+
                 client.send(
                     "action_error",
                     "Você precisa resolver sua situação na prisão primeiro."
                 );
+
                 return;
             }
 
             if (this.state.hasRolled) {
+
                 client.send(
                     "action_error",
                     "Você já rolou os dados nesta rodada."
                 );
+
                 return;
             }
 
-            if (this.state.hasMoved && !player.extraRollAvailable) {
+            if (
+                this.state.hasMoved &&
+                !player.extraRollAvailable
+            ) {
+
                 client.send(
                     "action_error",
                     "Você já movimentou nesta rodada."
                 );
+
                 return;
             }
 
-            // ----------------------------------------------
+            // --------------------------------------------------
             // ROLAR DADOS
-            // ----------------------------------------------
+            // --------------------------------------------------
 
-            const dice1 = Math.floor(Math.random() * 6) + 1;
-            const dice2 = Math.floor(Math.random() * 6) + 1;
+            const dice1 = 5//Math.floor(Math.random() * 6) + 1;
+            const dice2 = 3//Math.floor(Math.random() * 6) + 1;
 
             const rolledDoubles = dice1 === dice2;
 
@@ -1124,9 +1193,9 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
             this.state.hasMoved = false;
 
-            // ----------------------------------------------
+            // --------------------------------------------------
             // CONTAR DUPLAS CONSECUTIVAS
-            // ----------------------------------------------
+            // --------------------------------------------------
 
             if (rolledDoubles) {
 
@@ -1145,9 +1214,9 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                 `Duplas consecutivas: ${player.consecutiveDoubles}`
             );
 
-            // ----------------------------------------------
+            // --------------------------------------------------
             // TERCEIRA DUPLA: PRISÃO
-            // ----------------------------------------------
+            // --------------------------------------------------
 
             if (player.consecutiveDoubles >= 3) {
 
@@ -1160,14 +1229,26 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
                 player.position = PRISON_CELL;
 
-                player.lastCellType = this.board[PRISON_CELL].type;
-                player.lastCellName = this.board[PRISON_CELL].name;
+                player.lastCellType =
+                    this.board[PRISON_CELL].type;
 
-                player.inPrison = true;
+                player.lastCellName =
+                    this.board[PRISON_CELL].name;
+
+                // A prisão será ativada quando chegar.
+                // Manter inPrison como false durante a
+                // animação para exibir os dados a todos.
+                player.inPrison = false;
+
                 player.prisonAttempts = 0;
                 player.extraRollAvailable = false;
 
                 this.state.hasMoved = true;
+
+                // IMPORTANTE:
+                // Não apagar hasRolled nem lastRollBy.
+                // O resultado deve continuar visível
+                // durante toda a caminhada.
 
                 console.log(
                     `${player.name} fez três duplas e foi enviado à prisão.`
@@ -1177,17 +1258,14 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                     `Movimento: ${previousPosition} -> ${PRISON_CELL}`
                 );
 
-                // Aguardar a chegada visual antes de
-                // passar o turno.
                 this.queueMovementAnnouncement(
                     client.sessionId,
                     "triple_prison"
                 );
 
-                // Exibir o popup ANTES da caminhada.
-                this.showTripleDoublesAnnouncement(
-                    client.sessionId
-                );
+                // Não exibir o popup aqui.
+                // O anúncio será iniciado após todos
+                // confirmarem a chegada à casa 8.
 
                 return;
             }
@@ -1422,11 +1500,13 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             this.releasePlayerFromPrison(client.sessionId);
         },
 
+
         // --------------------------------------------------
         // MOVIMENTAR JOGADOR
         // --------------------------------------------------
 
         move: (client: Client) => {
+
             if (this.state.status !== "playing") {
                 return;
             }
@@ -1439,17 +1519,21 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                 return;
             }
 
-            const player = this.state.players.get(client.sessionId);
+            const player = this.state.players.get(
+                client.sessionId
+            );
 
             if (!player) {
                 return;
             }
 
             if (player.inPrison) {
+
                 client.send(
                     "action_error",
                     "Você precisa sair da prisão antes de movimentar."
                 );
+
                 return;
             }
 
@@ -1457,18 +1541,22 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                 !this.state.hasRolled ||
                 this.state.lastRollBy !== client.sessionId
             ) {
+
                 client.send(
                     "action_error",
                     "Você precisa rolar os dados primeiro."
                 );
+
                 return;
             }
 
             if (this.state.hasMoved) {
+
                 client.send(
                     "action_error",
                     "Você já movimentou nesta rodada."
                 );
+
                 return;
             }
 
@@ -1478,10 +1566,14 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             const rolledDoubles = dice1 === dice2;
 
             const steps = dice1 + dice2;
+
             const startingPosition = player.position;
             const newPosition = startingPosition + steps;
 
-            const completedLaps = Math.floor(newPosition / BOARD_SIZE);
+            const completedLaps = Math.floor(
+                newPosition / BOARD_SIZE
+            );
+
             const landedPosition = newPosition % BOARD_SIZE;
 
             player.position = landedPosition;
@@ -1506,7 +1598,12 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                 `Dados: ${dice1} + ${dice2} | Duplas: ${rolledDoubles}`
             );
 
+            // --------------------------------------------------
+            // RECOMPENSA POR COMPLETAR VOLTAS
+            // --------------------------------------------------
+
             if (completedLaps > 0) {
+
                 console.log(
                     `${player.name} completou ${completedLaps} volta(s). Total: ${player.laps}`
                 );
@@ -1530,13 +1627,17 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                 landedCell.type === "island";
 
             if (landedInPrison) {
-                player.inPrison = true;
+
+                // A prisão será ativada após a chegada.
+                // Enquanto caminha, manter a exibição
+                // do resultado dos dados.
+
                 player.prisonAttempts = 0;
                 player.extraRollAvailable = false;
 
-                this.state.hasRolled = false;
                 this.state.hasMoved = true;
-                this.state.lastRollBy = "";
+
+                // Não zerar hasRolled nem lastRollBy aqui.
 
                 console.log(
                     `${player.name} foi enviado para a prisão. O turno será encerrado após o anúncio.`
@@ -1549,6 +1650,10 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
 
                 return;
             }
+
+            // --------------------------------------------------
+            // CASA INICIAL
+            // --------------------------------------------------
 
             const landedExactlyOnStart =
                 landedPosition === 0 &&
@@ -1563,9 +1668,11 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
             let extraRollReason: ExtraRollReason | undefined;
 
             if (receivesStartExtraRoll) {
+
                 extraRollReason = "start";
-            }
-            else if (rolledDoubles) {
+
+            } else if (rolledDoubles) {
+
                 extraRollReason = "doubles";
             }
 
@@ -1584,13 +1691,21 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                 `recebe extra: ${canReceiveExtraRoll}`
             );
 
+            // --------------------------------------------------
+            // ROLAGEM EXTRA
+            // --------------------------------------------------
+
             if (canReceiveExtraRoll && extraRollReason) {
+
                 player.extraRollAvailable = true;
 
-                this.state.hasRolled = false;
                 this.state.hasMoved = true;
 
-                this.state.lastRollBy = "";
+                // Preservar hasRolled e lastRollBy
+                // até a chegada do personagem.
+                //
+                // Isso mantém o resultado visível
+                // para todos os clientes.
 
                 console.log(
                     `${player.name} recebeu uma rolagem extra pelo motivo: ${extraRollReason}.`
@@ -1601,16 +1716,23 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
                     "extra",
                     extraRollReason
                 );
-            }
-            else {
-                // Mesmo sem popup, aguardar a animação terminar
+
+            } else {
+
+                // --------------------------------------------------
+                // MOVIMENTO NORMAL
+                // --------------------------------------------------
+
+                // Mesmo sem popup, aguardar a animação
                 // antes de liberar as ações da HUD.
+
                 this.queueMovementAnnouncement(
                     client.sessionId,
                     "none"
                 );
             }
         },
+
 
         // --------------------------------------------------
         // ENCERRAR TURNO
@@ -2474,6 +2596,7 @@ partida_encerrar_turno = function() {
 
     colyseus_send(_net.net_room, "end_turn", {});
 };"
+
 obj_partida step:"/// obj_partida - Step
 
 var _net = instance_find(obj_network_manager, 0);
@@ -2701,41 +2824,48 @@ if (!partida_jogador_preso) {
     partida_prisao_acao_solicitada = false;
 }
 
-// --------------------------------------------------
-// CALCULAR POSIÇÕES DOS BOTÕES DA PRISÃO
-// --------------------------------------------------
 
-var _gui_w = display_get_gui_width();
-var _gui_h = display_get_gui_height();
+    // --------------------------------------------------
+    // CALCULAR POSIÇÕES DOS BOTÕES DA PRISÃO
+    // --------------------------------------------------
 
-var _prison_button_scale = 2.5;
+    var _gui_w = display_get_gui_width();
+    var _gui_h = display_get_gui_height();
 
-var _prison_button_width =
-    sprite_get_width(spr_botao2) * _prison_button_scale;
+    var _prison_button_scale = 2.5;
 
-var _prison_button_height =
-    sprite_get_height(spr_botao2) * _prison_button_scale;
+    var _prison_button_width =
+        sprite_get_width(spr_botao2) * _prison_button_scale;
 
-var _prison_button_center_x = _gui_w / 2;
-var _prison_button_center_y = _gui_h / 2 + 10;
+    var _prison_button_height =
+        sprite_get_height(spr_botao2) * _prison_button_scale;
 
-partida_prisao_botoes = [
-    {
-        x: _prison_button_center_x,
-        y: _prison_button_center_y - _prison_button_height * 0.85,
-        texto: "tentar duplas"
-    },
-    {
-        x: _prison_button_center_x,
-        y: _prison_button_center_y,
-        texto: "Pagar 200k"
-    },
-    {
-        x: _prison_button_center_x,
-        y: _prison_button_center_y + _prison_button_height * 0.85,
-        texto: "cobrar divida"
-    }
-];
+    var _prison_button_center_x = _gui_w / 2;
+    var _prison_button_center_y = _gui_h / 2 + 10;
+
+    // Usar exatamente o mesmo espaçamento do Draw GUI.
+    var _prison_button_spacing = 1.5;
+
+    partida_prisao_botoes = [
+        {
+            x: _prison_button_center_x,
+            y: _prison_button_center_y -
+               _prison_button_height * _prison_button_spacing,
+            texto: "tentar duplas"
+        },
+        {
+            x: _prison_button_center_x,
+            y: _prison_button_center_y,
+            texto: "Pagar 200k"
+        },
+        {
+            x: _prison_button_center_x,
+            y: _prison_button_center_y +
+               _prison_button_height * _prison_button_spacing,
+            texto: "cobrar divida"
+        }
+    ];
+
 
 // --------------------------------------------------
 // ATUALIZAR ANIMAÇÕES DE GANHO/PERDA DE DINHEIRO
@@ -3664,7 +3794,8 @@ if (mouse_check_button_pressed(mb_left)) {
         }
     }
 }"
-obj_partida draw gui:"/// obj_partida - Draw GUI
+
+draw gui:"/// obj_partida - Draw GUI
 
 var _gui_w = display_get_gui_width();
 var _gui_h = display_get_gui_height();
@@ -4204,27 +4335,91 @@ draw_set_font(-1);
 
 if (!partida_popup_ativo && !partida_prisao_menu_ativo) {
 
+ 
     // --------------------------------------------------
     // RESULTADO DOS DADOS
     // --------------------------------------------------
 
-    if (
-        partida_tem_rolagem &&
+    // Ler diretamente do servidor quem realizou
+    // a última rolagem.
+
+    var _autor_resultado = "";
+
+    if (_net != noone) {
+
+        if (_net.net_connected) {
+
+            var _estado_resultado =
+                colyseus_room_get_state(_net.net_room);
+
+            if (!is_undefined(_estado_resultado)) {
+
+                _autor_resultado = colyseus_schema_get(
+                    _estado_resultado,
+                    "lastRollBy"
+                );
+            }
+        }
+    }
+
+    // --------------------------------------------------
+    // VERIFICAR SE EXISTE UM RESULTADO VÁLIDO
+    // --------------------------------------------------
+
+    var _resultado_dados_validos = (
+        partida_dado1 >= 1 &&
+        partida_dado1 <= 6 &&
+        partida_dado2 >= 1 &&
+        partida_dado2 <= 6
+    );
+
+    var _resultado_tem_autor = (
+        !is_undefined(_autor_resultado) &&
+        _autor_resultado != ""
+    );
+
+    // --------------------------------------------------
+    // CONTROLAR EXIBIÇÃO DO RESULTADO
+    // --------------------------------------------------
+
+    // Não depender exclusivamente de
+    // partida_tem_rolagem.
+    //
+    // Após sair da prisão, o servidor limpa a
+    // rolagem antiga. Quando uma nova rolagem
+    // acontece, lastRollBy identifica seu autor.
+    //
+    // Isso também permite que todos os jogadores
+    // visualizem o resultado durante a movimentação.
+
+    var _mostrar_resultado_dados = (
+        _resultado_dados_validos &&
+        _resultado_tem_autor &&
         (
             !partida_jogador_preso ||
             partida_prisao_tentativa_em_andamento
         )
-    ) {
+    );
 
-        var _contador_escala = partida_escala_dados;
+    if (_mostrar_resultado_dados) {
+
+        // --------------------------------------------------
+        // CONFIGURAÇÕES DOS SPRITES
+        // --------------------------------------------------
+
+        var _contador_escala =
+            partida_escala_dados;
 
         var _contador_largura =
-            sprite_get_width(spr_dado_contador) * _contador_escala;
+            sprite_get_width(spr_dado_contador) *
+            _contador_escala;
 
         var _contador_altura =
-            sprite_get_height(spr_dado_contador) * _contador_escala;
+            sprite_get_height(spr_dado_contador) *
+            _contador_escala;
 
-        var _contador_espacamento = partida_espacamento_dados;
+        var _contador_espacamento =
+            partida_espacamento_dados;
 
         var _contador_grupo_largura =
             (_contador_largura * 2) +
@@ -4234,19 +4429,33 @@ if (!partida_popup_ativo && !partida_prisao_menu_ativo) {
             (_gui_w - _contador_grupo_largura) / 2;
 
         var _contador_y =
-            _gui_h / 2 - _contador_altura / 2 + 35;
+            _gui_h / 2 -
+            _contador_altura / 2 +
+            35;
+
+        // --------------------------------------------------
+        // PRIMEIRO DADO
+        // --------------------------------------------------
 
         draw_sprite_ext(
             spr_dado_contador,
             partida_dado1 - 1,
-            _contador_x + sprite_get_xoffset(spr_dado_contador) * _contador_escala,
-            _contador_y + sprite_get_yoffset(spr_dado_contador) * _contador_escala,
+            _contador_x +
+                sprite_get_xoffset(spr_dado_contador) *
+                _contador_escala,
+            _contador_y +
+                sprite_get_yoffset(spr_dado_contador) *
+                _contador_escala,
             _contador_escala,
             _contador_escala,
             0,
             c_white,
             1
         );
+
+        // --------------------------------------------------
+        // SEGUNDO DADO
+        // --------------------------------------------------
 
         var _contador_direita_x =
             _contador_x +
@@ -4256,8 +4465,12 @@ if (!partida_popup_ativo && !partida_prisao_menu_ativo) {
         draw_sprite_ext(
             spr_dado_contador,
             partida_dado2 - 1,
-            _contador_direita_x + sprite_get_xoffset(spr_dado_contador) * _contador_escala,
-            _contador_y + sprite_get_yoffset(spr_dado_contador) * _contador_escala,
+            _contador_direita_x +
+                sprite_get_xoffset(spr_dado_contador) *
+                _contador_escala,
+            _contador_y +
+                sprite_get_yoffset(spr_dado_contador) *
+                _contador_escala,
             _contador_escala,
             _contador_escala,
             0,
@@ -4266,14 +4479,31 @@ if (!partida_popup_ativo && !partida_prisao_menu_ativo) {
         );
 
         // --------------------------------------------------
-        // NÚMERO ANIMADO DO RESULTADO
+        // NÚMERO DO RESULTADO
         // --------------------------------------------------
 
-        var _valor_contador = partida_contador_resultado;
+        // Utilizar a soma real dos dados recebidos.
+        // Se houver animação de contagem válida,
+        // continuar exibindo essa animação.
 
-        if (partida_contador_ativo) {
-            _valor_contador = partida_contador_valor;
+        var _resultado_real =
+            partida_dado1 + partida_dado2;
+
+        var _valor_contador =
+            _resultado_real;
+
+        if (
+            partida_contador_ativo &&
+            partida_contador_resultado == _resultado_real
+        ) {
+
+            _valor_contador =
+                partida_contador_valor;
         }
+
+        // --------------------------------------------------
+        // DESENHAR RESULTADO
+        // --------------------------------------------------
 
         draw_set_font(fnt_pixelari);
         draw_set_halign(fa_center);
@@ -4288,11 +4518,12 @@ if (!partida_popup_ativo && !partida_prisao_menu_ativo) {
             0,
             4,
             c_white,
-            make_colour_rgb(16,20,31)
+            make_colour_rgb(16, 20, 31)
         );
 
         draw_set_font(-1);
     }
+
 
     // --------------------------------------------------
     // DESENHAR OS DOIS DADOS ANIMADOS
