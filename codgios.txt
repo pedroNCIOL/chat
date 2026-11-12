@@ -1,4 +1,4 @@
-obj_menu create: "
+obj_menu create:"
 /// obj_menu - Create
 
 enum telas {
@@ -27,7 +27,6 @@ botoes_funcao = [
 // PERSONAGENS
 // --------------------------------------------------
 
-// Lista de personagens disponíveis
 personagens = [
     personagem.boneco1,
     personagem.boneco2,
@@ -35,7 +34,6 @@ personagens = [
     personagem.boneco4
 ];
 
-// Sprites correspondentes aos personagens
 sprites_personagens = [
     spr_player1,
     spr_player2,
@@ -43,12 +41,11 @@ sprites_personagens = [
     spr_player4
 ];
 
-// Personagem selecionado
 personagem_indice = 0;
 personagem_atual = personagens[personagem_indice];
 
 // --------------------------------------------------
-// CORES DOS JOGADORES
+// CORES
 // --------------------------------------------------
 
 cores_jogador = [
@@ -65,22 +62,151 @@ cores_draw = [
     c_yellow
 ];
 
-// Índice da cor selecionada
 cor_indice = 0;
 cor_atual = cores_jogador[cor_indice];
 
 // --------------------------------------------------
-// NOME DO JOGADOR
+// PERFIL STEAM
 // --------------------------------------------------
 
-randomize();
+nome_jogador = "Carregando...";
 
-nome_jogador = choose(
-    "prikito",
-    "caneta azul",
-    "inxada",
-    "tira o ja"
-);
+menu_avatar_sprite = -1;
+menu_avatar_timer = 0;
+menu_avatar_carregado = false;
+
+// --------------------------------------------------
+// POSIÇÕES DA INTERFACE
+// --------------------------------------------------
+
+menu_perfil_x = 20;
+menu_perfil_y = 20;
+menu_perfil_tamanho = 80;
+
+menu_nome_x = 115;
+menu_nome_y = 26;
+
+menu_cores_x = 115;
+menu_cores_y = 72;
+menu_cor_tamanho = 36;
+menu_cor_espaco = 7;
+
+menu_personagem_x = 300;
+menu_personagem_y = 72;
+menu_personagem_largura = 85;
+menu_personagem_altura = 36;
+
+// --------------------------------------------------
+// CRIAR SPRITE A PARTIR DA IMAGEM STEAM
+// --------------------------------------------------
+
+menu_criar_avatar = function(_imagem) {
+
+    if (_imagem <= 0) return false;
+
+    // Steamworks 3.0.0:
+    // Retorna struct com width e height.
+    var _dimensoes = steam_utils_get_image_size(_imagem);
+
+    if (!is_struct(_dimensoes)) return false;
+
+    if (!variable_struct_exists(_dimensoes, "width")) {
+        return false;
+    }
+
+    if (!variable_struct_exists(_dimensoes, "height")) {
+        return false;
+    }
+
+    var _largura = _dimensoes.width;
+    var _altura = _dimensoes.height;
+
+    if (_largura <= 0 || _altura <= 0) return false;
+
+    var _tamanho_buffer = _largura * _altura * 4;
+
+    var _buffer = buffer_create(
+        _tamanho_buffer,
+        buffer_fixed,
+        1
+    );
+
+    // Steamworks 3.0.0:
+    // Esta função recebe somente 2 argumentos.
+    var _sucesso = steam_utils_get_image_rgba(
+        _imagem,
+        _buffer
+    );
+
+    if (!_sucesso) {
+
+        buffer_delete(_buffer);
+        return false;
+    }
+
+    var _surface = surface_create(_largura, _altura);
+
+    if (!surface_exists(_surface)) {
+
+        buffer_delete(_buffer);
+        return false;
+    }
+
+    // Copiar pixels da Steam para a surface.
+    buffer_set_surface(
+        _buffer,
+        _surface,
+        0
+    );
+
+    // Criar sprite dinâmico.
+    var _novo_sprite = sprite_create_from_surface(
+        _surface,
+        0,
+        0,
+        _largura,
+        _altura,
+        false,
+        false,
+        0,
+        0
+    );
+
+    surface_free(_surface);
+    buffer_delete(_buffer);
+
+    if (_novo_sprite == -1) return false;
+
+    // Liberar sprite antigo, se existir.
+    if (menu_avatar_sprite != -1) {
+
+        if (sprite_exists(menu_avatar_sprite)) {
+            sprite_delete(menu_avatar_sprite);
+        }
+    }
+
+    menu_avatar_sprite = _novo_sprite;
+    menu_avatar_carregado = true;
+
+    show_debug_message(
+        "Avatar Steam carregado com sucesso!"
+    );
+
+    return true;
+};
+
+// --------------------------------------------------
+// IDENTIDADE STEAM
+// --------------------------------------------------
+
+var _steam = instance_find(obj_steam, 0);
+
+if (_steam != noone) {
+
+    if (_steam.steam_player_name != "") {
+        nome_jogador = _steam.steam_player_name;
+    }
+}
 
 // --------------------------------------------------
 // CÓDIGO DA SALA
@@ -91,7 +217,7 @@ code = "";
 ativo_code = false;
 
 // --------------------------------------------------
-// MENSAGENS DA INTERFACE
+// MENSAGENS
 // --------------------------------------------------
 
 menu_mensagem = "";
@@ -121,6 +247,62 @@ obj_menu step:"
 /// obj_menu - Step
 
 var _net = instance_find(obj_network_manager, 0);
+
+// --------------------------------------------------
+// ATUALIZAR IDENTIDADE STEAM
+// --------------------------------------------------
+
+var _steam = instance_find(obj_steam, 0);
+
+if (_steam != noone) {
+
+    if (_steam.steam_player_name != "") {
+        nome_jogador = _steam.steam_player_name;
+    }
+}
+
+// --------------------------------------------------
+// CARREGAR FOTO DA STEAM
+// --------------------------------------------------
+
+if (!menu_avatar_carregado) {
+
+    if (steam_api_is_initialized()) {
+
+        if (menu_avatar_timer <= 0) {
+
+            // Steamworks 3.0.0.
+            var _steam_id = steam_user_get_steam_id();
+
+            // Avatar médio: 64x64 pixels.
+            var _imagem = steam_friends_get_large_friend_avatar(
+                _steam_id
+            );
+
+            if (_imagem > 0) {
+
+                menu_criar_avatar(_imagem);
+
+            } else {
+
+                // Se ainda não estiver disponível,
+                // tentar novamente posteriormente.
+                if (_imagem == -1) {
+
+                    show_debug_message(
+                        "Aguardando avatar da Steam..."
+                    );
+                }
+            }
+
+            menu_avatar_timer = 30;
+
+        } else {
+
+            menu_avatar_timer--;
+        }
+    }
+}
 
 // --------------------------------------------------
 // VERIFICAR SE A PARTIDA COMEÇOU
@@ -158,6 +340,7 @@ if (_net != noone) {
         for (var i = 0; i < array_length(cores_jogador); i++) {
 
             if (cores_jogador[i] == cor_atual) {
+
                 cor_indice = i;
                 break;
             }
@@ -241,7 +424,6 @@ if (ativo_code) {
                     cor_atual,
                     personagem_indice
                 );
-
             }
         }
     }
@@ -275,26 +457,17 @@ if (mouse_check_button_pressed(mb_left)) {
 
         case telas.menu:
 
-            // Gerar nome aleatório.
+            // --------------------------------------
+            // TROCAR PERSONAGEM
+            // --------------------------------------
+
             if (point_in_rectangle(
-                mouse_x, mouse_y,
-                20, 20, 300, 70
-            )) {
-
-                randomize();
-
-                nome_jogador = choose(
-                    "prikito",
-                    "neymar",
-                    "inxada",
-                    "tira o ja"
-                );
-            }
-
-            // Trocar personagem.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                20, 80, 300, 130
+                mouse_x,
+                mouse_y,
+                menu_personagem_x,
+                menu_personagem_y,
+                menu_personagem_x + menu_personagem_largura,
+                menu_personagem_y + menu_personagem_altura
             )) {
 
                 personagem_indice++;
@@ -306,16 +479,26 @@ if (mouse_check_button_pressed(mb_left)) {
                 personagem_atual = personagens[personagem_indice];
             }
 
-            // Selecionar cor.
+            // --------------------------------------
+            // SELECIONAR COR
+            // --------------------------------------
+
             for (var i = 0; i < array_length(cores_jogador); i++) {
 
-                var _color_left = 20 + i * 60;
-                var _color_right = _color_left + 50;
+                var _color_left =
+                    menu_cores_x +
+                    i * (menu_cor_tamanho + menu_cor_espaco);
+
+                var _color_right =
+                    _color_left + menu_cor_tamanho;
 
                 if (point_in_rectangle(
-                    mouse_x, mouse_y,
-                    _color_left, 145,
-                    _color_right, 195
+                    mouse_x,
+                    mouse_y,
+                    _color_left,
+                    menu_cores_y,
+                    _color_right,
+                    menu_cores_y + menu_cor_tamanho
                 )) {
 
                     cor_indice = i;
@@ -324,6 +507,10 @@ if (mouse_check_button_pressed(mb_left)) {
                     break;
                 }
             }
+
+            // --------------------------------------
+            // BOTÕES PRINCIPAIS
+            // --------------------------------------
 
             var _b1 = (_room_y / 2) - 100;
             var _b2 = (_room_y / 2) - 25;
@@ -335,9 +522,12 @@ if (mouse_check_button_pressed(mb_left)) {
                 var _right = _left + 250;
 
                 if (point_in_rectangle(
-                    mouse_x, mouse_y,
-                    _left, _b1,
-                    _right, _b2
+                    mouse_x,
+                    mouse_y,
+                    _left,
+                    _b1,
+                    _right,
+                    _b2
                 )) {
 
                     tela_atual = botoes_funcao[i];
@@ -351,7 +541,7 @@ if (mouse_check_button_pressed(mb_left)) {
                 }
             }
 
-            break;
+        break;
 
         // ==========================================
         // MENU PRIVADO
@@ -414,7 +604,7 @@ if (mouse_check_button_pressed(mb_left)) {
                 menu_mensagem = "";
             }
 
-            break;
+        break;
 
         // ==========================================
         // MENU PÚBLICO
@@ -525,7 +715,7 @@ if (mouse_check_button_pressed(mb_left)) {
                 }
             }
 
-            break;
+        break;
 
         // ==========================================
         // LOBBY
@@ -630,7 +820,6 @@ if (mouse_check_button_pressed(mb_left)) {
 
                 menu_conexao_anterior = false;
                 menu_aguardando = false;
-
                 ativo_code = false;
                 code = "";
                 keyboard_string = "";
@@ -645,7 +834,7 @@ if (mouse_check_button_pressed(mb_left)) {
                 break;
             }
 
-            // Iniciar partida privada: somente o anfitrião.
+            // Iniciar partida privada: somente anfitrião.
             if (_net != noone
             && _net.net_connected
             && _net.net_room_mode == "private"
@@ -670,7 +859,7 @@ if (mouse_check_button_pressed(mb_left)) {
                 }
             }
 
-            break;
+        break;
     }
 }
 "
@@ -684,57 +873,98 @@ var _b1 = (_room_y / 2) - 100;
 var _b2 = (_room_y / 2) - 25;
 var _b3 = (_room_x / 2) - 450;
 
-// Restaurar os estados de desenho
+// Restaurar estados de desenho.
 draw_set_alpha(1);
 draw_set_color(c_white);
 draw_set_halign(fa_left);
 draw_set_valign(fa_top);
 
 // --------------------------------------------------
-// MENU PRINCIPAL
+// TELAS
 // --------------------------------------------------
 
 switch (tela_atual) {
 
+    // ==============================================
+    // MENU PRINCIPAL
+    // ==============================================
+
     case telas.menu:
 
-        // Nome do jogador
-        if (point_in_rectangle(
-            mouse_x, mouse_y,
-            20, 20, 300, 70
-        )) {
-            draw_set_color(c_lime);
-        }
+        // ------------------------------------------
+        // FOTO DE PERFIL DA STEAM
+        // ------------------------------------------
 
-        draw_rectangle(20, 20, 300, 70, true);
-        draw_text_transformed(30, 35, nome_jogador, 1, 1, 0);
+        var _avatar_x = menu_perfil_x;
+        var _avatar_y = menu_perfil_y;
+        var _avatar_tamanho = menu_perfil_tamanho;
 
-        draw_set_color(c_white);
+        // Fundo enquanto a imagem carrega.
+        draw_set_color(c_black);
 
-        // Botão de trocar personagem
-        if (point_in_rectangle(
-            mouse_x, mouse_y,
-            20, 80, 300, 130
-        )) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(20, 80, 300, 130, true);
-
-        // Desenhar sprite do personagem selecionado
-        draw_sprite_ext(
-            sprites_personagens[personagem_indice],
-            0,
-            160,
-            105,
-            1,
-            1,
-            0,
-            c_white,
-            1
+        draw_rectangle(
+            _avatar_x,
+            _avatar_y,
+            _avatar_x + _avatar_tamanho,
+            _avatar_y + _avatar_tamanho,
+            false
         );
 
         draw_set_color(c_white);
+
+        // Desenhar foto carregada.
+        if (menu_avatar_carregado) {
+
+            if (sprite_exists(menu_avatar_sprite)) {
+
+                var _sprite_w = sprite_get_width(menu_avatar_sprite);
+                var _sprite_h = sprite_get_height(menu_avatar_sprite);
+
+                var _scale_x = _avatar_tamanho / _sprite_w;
+                var _scale_y = _avatar_tamanho / _sprite_h;
+				 gpu_set_texfilter(true);
+                draw_sprite_ext(
+                    menu_avatar_sprite,
+                    0,
+                    _avatar_x,
+                    _avatar_y,
+                    _scale_x,
+                    _scale_y,
+                    0,
+                    c_white,
+                    1
+                );
+				 gpu_set_texfilter(false);
+            }
+        }
+
+        // Borda branca por cima da foto.
+        draw_set_color(c_white);
+        draw_set_alpha(1);
+
+        draw_rectangle(
+            _avatar_x,
+            _avatar_y,
+            _avatar_x + _avatar_tamanho,
+            _avatar_y + _avatar_tamanho,
+            true
+        );
+
+        // ------------------------------------------
+        // NOME DO JOGADOR
+        // ------------------------------------------
+
+        draw_set_color(c_white);
+        draw_set_halign(fa_left);
+
+        draw_text_transformed(
+            menu_nome_x,
+            menu_nome_y,
+            nome_jogador,
+            1,
+            1,
+            0
+        );
 
         // ------------------------------------------
         // SELEÇÃO DE CORES
@@ -742,16 +972,17 @@ switch (tela_atual) {
 
         for (var i = 0; i < array_length(cores_jogador); i++) {
 
-            var _color_left = 20 + i * 60;
-            var _color_top = 145;
-            var _color_right = _color_left + 50;
-            var _color_bottom = _color_top + 50;
+            var _color_left =
+                menu_cores_x +
+                i * (menu_cor_tamanho + menu_cor_espaco);
 
-            // Garantir alpha normal antes de desenhar a cor
+            var _color_top = menu_cores_y;
+            var _color_right = _color_left + menu_cor_tamanho;
+            var _color_bottom = _color_top + menu_cor_tamanho;
+
             draw_set_alpha(1);
             draw_set_color(cores_draw[i]);
 
-            // Quadrado colorido
             draw_rectangle(
                 _color_left,
                 _color_top,
@@ -760,11 +991,11 @@ switch (tela_atual) {
                 false
             );
 
-            // Aplicar transparência somente na cor selecionada
+            // Escurecer a cor selecionada.
             if (i == cor_indice) {
 
                 draw_set_color(c_black);
-                draw_set_alpha(.8);
+                draw_set_alpha(0.8);
 
                 draw_rectangle(
                     _color_left,
@@ -775,13 +1006,77 @@ switch (tela_atual) {
                 );
             }
 
-            // Restaurar alpha antes do próximo quadrado
             draw_set_alpha(1);
+            draw_set_color(c_white);
         }
+
+        // ------------------------------------------
+        // BOTÃO DE TROCAR PERSONAGEM
+        // ------------------------------------------
+
+        var _personagem_left = menu_personagem_x;
+        var _personagem_top = menu_personagem_y;
+
+        var _personagem_right =
+            _personagem_left + menu_personagem_largura;
+
+        var _personagem_bottom =
+            _personagem_top + menu_personagem_altura;
+
+        if (point_in_rectangle(
+            mouse_x,
+            mouse_y,
+            _personagem_left,
+            _personagem_top,
+            _personagem_right,
+            _personagem_bottom
+        )) {
+            draw_set_color(c_lime);
+        }
+
+        draw_rectangle(
+            _personagem_left,
+            _personagem_top,
+            _personagem_right,
+            _personagem_bottom,
+            true
+        );
 
         draw_set_color(c_white);
 
-        // Botões principais
+        // Desenhar personagem selecionado.
+        var _personagem_sprite =
+            sprites_personagens[personagem_indice];
+
+        var _personagem_sprite_w =
+            sprite_get_width(_personagem_sprite);
+
+        var _personagem_sprite_h =
+            sprite_get_height(_personagem_sprite);
+
+        var _personagem_scale = min(
+            menu_personagem_largura / _personagem_sprite_w,
+            menu_personagem_altura / _personagem_sprite_h
+        );
+
+        draw_sprite_ext(
+            _personagem_sprite,
+            0,
+            _personagem_left +
+                (menu_personagem_largura - _personagem_sprite_w * _personagem_scale) / 2,
+            _personagem_top +
+                (menu_personagem_altura - _personagem_sprite_h * _personagem_scale) / 2,
+            _personagem_scale,
+            _personagem_scale,
+            0,
+            c_white,
+            1
+        );
+
+        // ------------------------------------------
+        // BOTÕES PRINCIPAIS
+        // ------------------------------------------
+
         for (var i = 0; i < 2; i++) {
 
             var _left = _b3 + i * 300;
@@ -814,16 +1109,15 @@ switch (tela_atual) {
             draw_set_color(c_white);
         }
 
-        break;
+    break;
 
-
-    // --------------------------------------------------
+    // ==============================================
     // MENU PRIVADO
-    // --------------------------------------------------
+    // ==============================================
 
     case telas.menu_partida_privada:
 
-        // Criar partida
+        // Criar partida.
         if (point_in_rectangle(
             mouse_x, mouse_y,
             _room_x / 2 - 200,
@@ -854,7 +1148,7 @@ switch (tela_atual) {
         draw_set_color(c_white);
         draw_set_halign(fa_left);
 
-        // Título do campo
+        // Título do campo.
         draw_set_halign(fa_center);
 
         draw_text_transformed(
@@ -866,7 +1160,7 @@ switch (tela_atual) {
 
         draw_set_halign(fa_left);
 
-        // Campo de código
+        // Campo de código.
         if (ativo_code) {
             draw_set_color(c_lime);
         }
@@ -893,8 +1187,8 @@ switch (tela_atual) {
             );
 
             draw_set_alpha(1);
-        }
-        else {
+
+        } else {
 
             draw_text_transformed(
                 _room_x / 2 - 90,
@@ -904,7 +1198,7 @@ switch (tela_atual) {
             );
         }
 
-        // Voltar
+        // Voltar.
         if (point_in_rectangle(
             mouse_x, mouse_y,
             20, 670, 300, 740
@@ -917,16 +1211,15 @@ switch (tela_atual) {
 
         draw_set_color(c_white);
 
-        break;
+    break;
 
-
-    // --------------------------------------------------
+    // ==============================================
     // MENU PÚBLICO
-    // --------------------------------------------------
+    // ==============================================
 
     case telas.menu_partida_publica:
 
-        // Voltar
+        // Voltar.
         if (point_in_rectangle(
             mouse_x, mouse_y,
             20, 670, 300, 740
@@ -939,7 +1232,7 @@ switch (tela_atual) {
 
         draw_set_color(c_white);
 
-        // Procurar partida
+        // Procurar partida.
         if (point_in_rectangle(
             mouse_x, mouse_y,
             _room_x / 2 - 100,
@@ -970,10 +1263,7 @@ switch (tela_atual) {
         draw_set_halign(fa_left);
         draw_set_color(c_white);
 
-        // ------------------------------------------
-        // ENTRAR POR CÓDIGO DE PARTIDA PÚBLICA
-        // ------------------------------------------
-
+        // Entrar por código.
         draw_set_halign(fa_center);
 
         draw_text_transformed(
@@ -1011,8 +1301,8 @@ switch (tela_atual) {
             );
 
             draw_set_alpha(1);
-        }
-        else {
+
+        } else {
 
             draw_text_transformed(
                 _room_x / 2 - 430,
@@ -1022,10 +1312,7 @@ switch (tela_atual) {
             );
         }
 
-        // ------------------------------------------
-        // LISTA DE PARTIDAS
-        // ------------------------------------------
-
+        // Lista de partidas.
         draw_set_halign(fa_center);
 
         draw_text_transformed(
@@ -1124,12 +1411,11 @@ switch (tela_atual) {
             }
         }
 
-        break;
+    break;
 
-
-    // --------------------------------------------------
+    // ==============================================
     // LOBBY
-    // --------------------------------------------------
+    // ==============================================
 
     case telas.lobby:
 
@@ -1180,7 +1466,6 @@ switch (tela_atual) {
 
             var _color_occupied = false;
 
-            // Verificar se algum jogador está usando essa cor
             if (_net != noone) {
 
                 for (var j = 0; j < array_length(_net.net_players); j++) {
@@ -1197,7 +1482,6 @@ switch (tela_atual) {
                 }
             }
 
-            // Desenhar quadrado colorido
             draw_set_alpha(1);
             draw_set_color(cores_draw[i]);
 
@@ -1209,7 +1493,6 @@ switch (tela_atual) {
                 false
             );
 
-            // Escurecer cores ocupadas
             if (_color_occupied) {
 
                 draw_set_color(c_black);
@@ -1268,7 +1551,6 @@ switch (tela_atual) {
                 }
             }
 
-            // Desenhar a faixa somente se existir jogador
             if (_has_player) {
 
                 var _box_color = c_red;
@@ -1277,19 +1559,19 @@ switch (tela_atual) {
 
                     case "red":
                         _box_color = c_red;
-                        break;
+                    break;
 
                     case "blue":
                         _box_color = c_blue;
-                        break;
+                    break;
 
                     case "green":
                         _box_color = c_green;
-                        break;
+                    break;
 
                     case "yellow":
                         _box_color = c_yellow;
-                        break;
+                    break;
                 }
 
                 draw_set_alpha(1);
@@ -1306,7 +1588,6 @@ switch (tela_atual) {
 
             draw_set_alpha(1);
             draw_set_color(c_white);
-
             draw_set_halign(fa_center);
 
             draw_text_transformed(
@@ -1320,7 +1601,7 @@ switch (tela_atual) {
         }
 
         // ------------------------------------------
-        // CONTAGEM AUTOMÁTICA DAS PARTIDAS PÚBLICAS
+        // CONTAGEM AUTOMÁTICA
         // ------------------------------------------
 
         if (_net != noone
@@ -1379,8 +1660,7 @@ switch (tela_atual) {
         draw_set_color(c_white);
 
         // ------------------------------------------
-        // BOTÃO INICIAR PARTIDA
-        // SOMENTE PARA PARTIDAS PRIVADAS
+        // BOTÃO INICIAR PARTIDA PRIVADA
         // ------------------------------------------
 
         if (_net != noone
@@ -1420,7 +1700,7 @@ switch (tela_atual) {
             draw_set_color(c_white);
         }
 
-        break;
+    break;
 }
 
 // --------------------------------------------------
@@ -1458,4 +1738,18 @@ if (menu_erro != "") {
 draw_set_alpha(1);
 draw_set_color(c_white);
 draw_set_halign(fa_left);
+"
+obj_menu clean up:"
+/// obj_menu - Clean Up
+
+if (menu_avatar_sprite != -1) {
+
+    if (sprite_exists(menu_avatar_sprite)) {
+        sprite_delete(menu_avatar_sprite);
+    }
+
+    menu_avatar_sprite = -1;
+}
+
+menu_avatar_carregado = false;
 "
