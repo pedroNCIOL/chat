@@ -1,5 +1,4 @@
-obj_menu create:"
-/// obj_menu - Create
+obj_menu create:"/// obj_menu - Create
 
 enum telas {
     menu,
@@ -19,20 +18,11 @@ enum personagem {
 tela_atual = telas.menu;
 
 // --------------------------------------------------
-// BOTÕES DO MENU PRINCIPAL
+// BOTOES DO MENU PRINCIPAL
 // --------------------------------------------------
 
-botoes_menu = [
-    "Partida Privada",
-    "Partida Publica",
-    "Customizacao"
-];
-
-botoes_funcao = [
-    telas.menu_partida_privada,
-    telas.menu_partida_publica,
-    telas.customizacao
-];
+botoes_menu = ["Partida Privada", "Partida Publica", "Customizacao"];
+botoes_funcao = [telas.menu_partida_privada, telas.menu_partida_publica, telas.customizacao];
 
 menu_botoes_x = 190;
 menu_botoes_y = 260;
@@ -41,339 +31,217 @@ menu_botoes_altura = 75;
 menu_botoes_espaco = 25;
 
 // --------------------------------------------------
-// PERSONAGENS
+// PERSONAGENS / CORES
 // --------------------------------------------------
 
-personagens = [
-    personagem.boneco1,
-    personagem.boneco2,
-    personagem.boneco3,
-    personagem.boneco4
-];
-
-sprites_personagens = [
-    spr_player1,
-    spr_player2,
-    spr_player3,
-    spr_player4
-];
-
+personagens = [personagem.boneco1, personagem.boneco2, personagem.boneco3, personagem.boneco4];
+sprites_personagens = [spr_player1, spr_player2, spr_player3, spr_player4];
 personagem_indice = 0;
 personagem_atual = personagens[personagem_indice];
 
-// --------------------------------------------------
-// CORES
-// --------------------------------------------------
-
-cores_jogador = [
-    "red",
-    "blue",
-    "green",
-    "yellow"
-];
-
-cores_draw = [
-    c_red,
-    c_blue,
-    c_green,
-    c_yellow
-];
-
+cores_jogador = ["red", "blue", "green", "yellow"];
+cores_draw = [c_red, c_blue, c_green, c_yellow];
 cor_indice = 0;
 cor_atual = cores_jogador[cor_indice];
 
 // --------------------------------------------------
-// PERFIL STEAM
+// PERFIL STEAM - PRESERVADO
 // --------------------------------------------------
 
 nome_jogador = "Carregando...";
-
 menu_avatar_sprite = -1;
 menu_avatar_timer = 0;
 menu_avatar_carregado = false;
 
-// --------------------------------------------------
-// POSIÇÕES DA INTERFACE
-// --------------------------------------------------
-
 menu_perfil_x = 20;
 menu_perfil_y = 20;
 menu_perfil_tamanho = 80;
-
 menu_nome_x = 115;
 menu_nome_y = 26;
 
-// Seleção de cor.
+// --------------------------------------------------
+// CUSTOMIZACAO
+// --------------------------------------------------
+
 menu_cores_x = 115;
 menu_cores_y = 165;
 menu_cor_tamanho = 36;
 menu_cor_espaco = 7;
 
-// --------------------------------------------------
-// BOTÕES DE PERSONAGEM
-// GRADE 2x2 CENTRALIZADA
-// --------------------------------------------------
-
 menu_personagens_x = 472.5;
 menu_personagens_y = 210;
-
 menu_personagens_titulo_x = menu_personagens_x;
 menu_personagens_titulo_y = 165;
-
 menu_personagem_botao_largura = 150;
 menu_personagem_botao_altura = 150;
 menu_personagem_botao_espaco_x = 35;
 menu_personagem_botao_espaco_y = 35;
 
 // --------------------------------------------------
-// CRIAR SPRITE A PARTIR DA IMAGEM STEAM
+// BARRA LATERAL / SCROLL
+// --------------------------------------------------
+
+menu_lateral_ativa = false;
+menu_lateral_abertura = 0;
+menu_botoes_deslocamento = 0;
+menu_lateral_scroll_ratio = 0;
+menu_lateral_scroll_arrastando = false;
+menu_lateral_scroll_click_offset = 0;
+
+// --------------------------------------------------
+// CRIAR AVATAR A PARTIR DA STEAM
 // --------------------------------------------------
 
 menu_criar_avatar = function(_imagem) {
-
     if (_imagem <= 0) return false;
 
     var _dimensoes = steam_utils_get_image_size(_imagem);
-
     if (!is_struct(_dimensoes)) return false;
-
-    if (!variable_struct_exists(_dimensoes, "width")) {
-        return false;
-    }
-
-    if (!variable_struct_exists(_dimensoes, "height")) {
-        return false;
-    }
+    if (!variable_struct_exists(_dimensoes, "width")) return false;
+    if (!variable_struct_exists(_dimensoes, "height")) return false;
 
     var _largura = _dimensoes.width;
     var _altura = _dimensoes.height;
-
     if (_largura <= 0 || _altura <= 0) return false;
 
-    var _tamanho_buffer = _largura * _altura * 4;
-
-    var _buffer = buffer_create(
-        _tamanho_buffer,
-        buffer_fixed,
-        1
-    );
-
-    var _sucesso = steam_utils_get_image_rgba(
-        _imagem,
-        _buffer
-    );
-
+    var _buffer = buffer_create(_largura * _altura * 4, buffer_fixed, 1);
+    var _sucesso = steam_utils_get_image_rgba(_imagem, _buffer);
     if (!_sucesso) {
         buffer_delete(_buffer);
         return false;
     }
 
     var _surface = surface_create(_largura, _altura);
-
     if (!surface_exists(_surface)) {
         buffer_delete(_buffer);
         return false;
     }
 
-    buffer_set_surface(
-        _buffer,
-        _surface,
-        0
-    );
-
+    buffer_set_surface(_buffer, _surface, 0);
     var _novo_sprite = sprite_create_from_surface(
-        _surface,
-        0,
-        0,
-        _largura,
-        _altura,
-        false,
-        false,
-        0,
-        0
+        _surface, 0, 0, _largura, _altura,
+        false, false, 0, 0
     );
-
     surface_free(_surface);
     buffer_delete(_buffer);
 
     if (_novo_sprite == -1) return false;
-
-    if (menu_avatar_sprite != -1) {
-
-        if (sprite_exists(menu_avatar_sprite)) {
-            sprite_delete(menu_avatar_sprite);
-        }
+    if (menu_avatar_sprite != -1 && sprite_exists(menu_avatar_sprite)) {
+        sprite_delete(menu_avatar_sprite);
     }
 
     menu_avatar_sprite = _novo_sprite;
     menu_avatar_carregado = true;
-
-    show_debug_message(
-        "Avatar Steam carregado com sucesso!"
-    );
-
+    show_debug_message("Avatar Steam carregado com sucesso!");
     return true;
 };
 
-// --------------------------------------------------
-// IDENTIDADE STEAM
-// --------------------------------------------------
-
 var _steam = instance_find(obj_steam, 0);
-
-if (_steam != noone) {
-
-    if (_steam.steam_player_name != "") {
-        nome_jogador = _steam.steam_player_name;
-    }
+if (_steam != noone && _steam.steam_player_name != "") {
+    nome_jogador = _steam.steam_player_name;
 }
-
-// --------------------------------------------------
-// CÓDIGO DA SALA
-// --------------------------------------------------
 
 codigo_sala_privada = "";
 code = "";
 ativo_code = false;
-
-// --------------------------------------------------
-// MENSAGENS
-// --------------------------------------------------
-
 menu_mensagem = "";
 menu_erro = "";
-
-// --------------------------------------------------
-// CONTROLE DE CONEXÃO
-// --------------------------------------------------
-
 menu_aguardando = false;
 menu_conexao_anterior = false;
-
-// --------------------------------------------------
-// LISTAGEM PÚBLICA
-// --------------------------------------------------
-
 partidas_existentes = 0;
 partida_selecionada = -1;
-
-// --------------------------------------------------
-// LOBBY
-// --------------------------------------------------
-
 qtd_players = 0;
 "
-
 obj_menu step:"/// obj_menu - Step
 
 var _net = instance_find(obj_network_manager, 0);
 
 // --------------------------------------------------
-// ANIMACAO DA LATERAL (LIMITE 125 / 273)
+// LATERAL: DETECCAO 0-125 FECHADA / 0-273 ABERTA
 // --------------------------------------------------
 
-if (!variable_instance_exists(id, "menu_lateral_abertura")) {
-    menu_lateral_abertura = 0;
-    menu_botoes_deslocamento = 0;
-}
-if (!variable_instance_exists(id, "menu_lateral_ativa")) {
-    menu_lateral_ativa = false;
-}
-if (!variable_instance_exists(id, "menu_amigos_scroll")) {
-    menu_amigos_scroll = 0;
-    menu_amigos_arrastando = false;
-    menu_amigos_arrasto_offset = 0;
-}
+var _limite_lateral = 125;
+if (menu_lateral_ativa) _limite_lateral = 273;
 
-var _alvo_lateral = 0;
-var _alvo_botoes = 0;
+var _intro_liberada = true;
+var _camera_intro = instance_find(obj_camera, 0);
+if (_camera_intro != noone) _intro_liberada = _camera_intro.intro_finalizada;
 
-if (tela_atual == telas.menu) {
-    var _limite_deteccao = 125;
-    if (menu_lateral_ativa) _limite_deteccao = 273;
-
-    menu_lateral_ativa = (
-        mouse_x >= 0 && mouse_x <= _limite_deteccao &&
-        mouse_y >= 0 && mouse_y <= 720
+if (tela_atual == telas.menu && _intro_liberada) {
+    menu_lateral_ativa = point_in_rectangle(
+        mouse_x, mouse_y, 0, 0, _limite_lateral, 720
     );
-
-    if (menu_lateral_ativa) {
-        _alvo_lateral = 272;
-        _alvo_botoes = 272;
-    }
 } else {
     menu_lateral_ativa = false;
 }
 
-menu_lateral_abertura = lerp(menu_lateral_abertura, _alvo_lateral, 0.3);
-menu_botoes_deslocamento = lerp(menu_botoes_deslocamento, _alvo_botoes, 0.3);
-if (abs(menu_lateral_abertura - _alvo_lateral) < 0.1) menu_lateral_abertura = _alvo_lateral;
-if (abs(menu_botoes_deslocamento - _alvo_botoes) < 0.1) menu_botoes_deslocamento = _alvo_botoes;
+// O movimento da barra e dos botoes usa o mesmo lerp.
+var _lateral_alvo = 0;
+if (menu_lateral_ativa) _lateral_alvo = 272;
+
+menu_lateral_abertura = lerp(menu_lateral_abertura, _lateral_alvo, 0.3);
+menu_botoes_deslocamento = lerp(menu_botoes_deslocamento, _lateral_alvo, 0.3);
+
+if (abs(menu_lateral_abertura - _lateral_alvo) < 0.1) {
+    menu_lateral_abertura = _lateral_alvo;
+}
+if (abs(menu_botoes_deslocamento - _lateral_alvo) < 0.1) {
+    menu_botoes_deslocamento = _lateral_alvo;
+}
+
+// Posicao do sprite 273px: completamente fora da tela em X=-275.
+// Quando totalmente aberto, X=0.
+var _lateral_x = -275 + (menu_lateral_abertura / 272) * 275;
 
 // --------------------------------------------------
-// SCROLLBAR DA LISTA DE AMIGOS (SEM DADOS AINDA)
+// SCROLLBAR: MESMAS COORDENADAS UTILIZADAS NO DRAW
 // --------------------------------------------------
 
-// Todos os sprites da lateral usam origem top-left.
-// O trilho comeca na area inferior do painel (imagem de referencia).
-var _barra_visual_x = menu_lateral_abertura - 274 + 2 * (menu_lateral_abertura / 272);
-var _lista_topo = 383;
-var _scroll_x = _barra_visual_x + 7;
-var _scroll_y = _lista_topo;
+var _scroll_x = _lateral_x + 7;
+var _scroll_y = 395;
+var _scroll_altura = 310;
 var _scroll_largura = sprite_get_width(spr_scroll_bar);
-var _scroll_altura = sprite_get_height(spr_scroll_bar);
-var _scroll_botao_largura = sprite_get_width(spr_scroll_bar_button);
-var _scroll_botao_altura = sprite_get_height(spr_scroll_bar_button);
+var _botao_scroll_altura = sprite_get_height(spr_scroll_bar_button);
+// O botao e escalado no Draw para esta mesma largura.
+var _botao_scroll_largura = _scroll_largura;
+var _deslocamento_maximo = max(0, _scroll_altura - _botao_scroll_altura);
+var _botao_scroll_y = _scroll_y + _deslocamento_maximo * menu_lateral_scroll_ratio;
 
-// Limitar o arraste a area visivel 1280x720.
-var _trilho_altura = min(_scroll_altura, 720 - _scroll_y - 8);
-var _scroll_percurso = max(0, _trilho_altura - _scroll_botao_altura);
-var _bolinha_y = _scroll_y + menu_amigos_scroll * _scroll_percurso;
-var _lista_mouse = (
-    mouse_x >= 0 && mouse_x <= 273 &&
-    mouse_y >= _lista_topo && mouse_y <= 720
-);
-var _lateral_interativa = (
-    tela_atual == telas.menu && menu_lateral_ativa &&
-    menu_lateral_abertura >= 270
-);
-
-if (!_lateral_interativa) {
-    menu_amigos_arrastando = false;
+// Todos os comandos da lateral param assim que o mouse sai da area.
+if (!menu_lateral_ativa) {
+    menu_lateral_scroll_arrastando = false;
 } else {
-    if (_lista_mouse) {
-        if (mouse_wheel_up()) menu_amigos_scroll = clamp(menu_amigos_scroll - 0.08, 0, 1);
-        if (mouse_wheel_down()) menu_amigos_scroll = clamp(menu_amigos_scroll + 0.08, 0, 1);
-    }
-
     if (mouse_check_button_pressed(mb_left)) {
         if (point_in_rectangle(
             mouse_x, mouse_y,
-            _scroll_x - 3, _bolinha_y,
-            _scroll_x + max(_scroll_largura, _scroll_botao_largura) + 3,
-            _bolinha_y + _scroll_botao_altura
+            _scroll_x, _botao_scroll_y,
+            _scroll_x + _botao_scroll_largura,
+            _botao_scroll_y + _botao_scroll_altura
         )) {
-            menu_amigos_arrastando = true;
-            menu_amigos_arrasto_offset = mouse_y - _bolinha_y;
+            menu_lateral_scroll_arrastando = true;
+            menu_lateral_scroll_click_offset = mouse_y - _botao_scroll_y;
         }
     }
 
-    if (menu_amigos_arrastando) {
-        if (mouse_check_button(mb_left)) {
-            if (_scroll_percurso > 0) {
-                menu_amigos_scroll = clamp(
-                    (mouse_y - menu_amigos_arrasto_offset - _scroll_y) / _scroll_percurso,
-                    0, 1
-                );
-            }
+    if (point_in_rectangle(mouse_x, mouse_y, 0, 390, 273, 720)) {
+        if (mouse_wheel_up()) menu_lateral_scroll_ratio -= 0.08;
+        if (mouse_wheel_down()) menu_lateral_scroll_ratio += 0.08;
+    }
+
+    if (menu_lateral_scroll_arrastando) {
+        if (!mouse_check_button(mb_left)) {
+            menu_lateral_scroll_arrastando = false;
         } else {
-            menu_amigos_arrastando = false;
+            var _novo_y = mouse_y - menu_lateral_scroll_click_offset;
+            menu_lateral_scroll_ratio = (_novo_y - _scroll_y) / max(1, _deslocamento_maximo);
         }
     }
 }
 
+menu_lateral_scroll_ratio = clamp(menu_lateral_scroll_ratio, 0, 1);
+
 // --------------------------------------------------
-// ATUALIZAR IDENTIDADE STEAM
+// STEAM: NOME E AVATAR
 // --------------------------------------------------
 
 var _steam = instance_find(obj_steam, 0);
@@ -381,26 +249,20 @@ if (_steam != noone) {
     if (_steam.steam_player_name != "") nome_jogador = _steam.steam_player_name;
 }
 
-// --------------------------------------------------
-// CARREGAR FOTO DA STEAM
-// --------------------------------------------------
-
-if (!menu_avatar_carregado) {
-    if (steam_api_is_initialized()) {
-        if (menu_avatar_timer <= 0) {
-            var _steam_id = steam_user_get_steam_id();
-            var _imagem = steam_friends_get_large_friend_avatar(_steam_id);
-            if (_imagem > 0) menu_criar_avatar(_imagem);
-            else if (_imagem == -1) show_debug_message("Aguardando avatar da Steam...");
-            menu_avatar_timer = 30;
-        } else {
-            menu_avatar_timer--;
-        }
+if (!menu_avatar_carregado && steam_api_is_initialized()) {
+    if (menu_avatar_timer <= 0) {
+        var _steam_id = steam_user_get_steam_id();
+        var _imagem = steam_friends_get_large_friend_avatar(_steam_id);
+        if (_imagem > 0) menu_criar_avatar(_imagem);
+        else if (_imagem == -1) show_debug_message("Aguardando avatar da Steam...");
+        menu_avatar_timer = 30;
+    } else {
+        menu_avatar_timer--;
     }
 }
 
 // --------------------------------------------------
-// VERIFICAR INICIO DA PARTIDA
+// INICIO DE PARTIDA E CONEXAO
 // --------------------------------------------------
 
 if (_net != noone && _net.net_game_started) {
@@ -408,10 +270,6 @@ if (_net != noone && _net.net_game_started) {
     room_goto(rm_jogo);
     exit;
 }
-
-// --------------------------------------------------
-// VERIFICAR CONEXAO
-// --------------------------------------------------
 
 if (_net != noone) {
     if (_net.net_connected && !menu_conexao_anterior) {
@@ -424,23 +282,27 @@ if (_net != noone) {
         codigo_sala_privada = _net.net_room_id;
         cor_atual = _net.net_player_color;
         for (var i = 0; i < array_length(cores_jogador); i++) {
-            if (cores_jogador[i] == cor_atual) { cor_indice = i; break; }
+            if (cores_jogador[i] == cor_atual) {
+                cor_indice = i;
+                break;
+            }
         }
     }
+
     if (_net.net_error != "") {
         menu_erro = _net.net_error;
         menu_aguardando = false;
     }
+
     partidas_existentes = array_length(_net.net_lobby_rooms);
     if (_net.net_connected) qtd_players = array_length(_net.net_players);
 }
 
 // --------------------------------------------------
-// BLOQUEAR INTERACAO DURANTE A INTRODUCAO
+// INTRODUCAO DA CAMERA: BLOQUEAR CLIQUES
 // --------------------------------------------------
 
-var _camera_intro = instance_find(obj_camera, 0);
-if (_camera_intro != noone && !_camera_intro.intro_finalizada) exit;
+if (!_intro_liberada) exit;
 
 // --------------------------------------------------
 // DIGITACAO DE CODIGOS
@@ -462,10 +324,10 @@ if (ativo_code) {
         ativo_code = false;
         code = string_trim(code);
         if (string_length(code) != 6) {
-            menu_erro = "O código deve ter exatamente 6 caracteres.";
+            menu_erro = "O codigo deve ter exatamente 6 caracteres.";
             menu_mensagem = "";
         } else if (_net == noone) {
-            menu_erro = "Gerenciador de rede não encontrado.";
+            menu_erro = "Gerenciador de rede nao encontrado.";
         } else {
             menu_erro = "";
             menu_mensagem = "Verificando sala...";
@@ -477,6 +339,7 @@ if (ativo_code) {
             }
         }
     }
+
     if (keyboard_check_pressed(vk_escape)) {
         ativo_code = false;
         code = "";
@@ -485,7 +348,7 @@ if (ativo_code) {
 }
 
 // --------------------------------------------------
-// CLIQUES DO MENU - AREA 1280x720
+// CLIQUES DAS TELAS
 // --------------------------------------------------
 
 if (mouse_check_button_pressed(mb_left)) {
@@ -495,15 +358,15 @@ if (mouse_check_button_pressed(mb_left)) {
 
     switch (tela_atual) {
         case telas.menu:
-            // Convidar/adicionar ainda sao apenas visuais.
-            // A bolinha da scrollbar e controlada acima.
             for (var i = 0; i < array_length(botoes_menu); i++) {
                 var _left = menu_botoes_x + menu_botoes_deslocamento +
                     i * (menu_botoes_largura + menu_botoes_espaco);
-                if (point_in_rectangle(_mouse_x, _mouse_y,
+                if (point_in_rectangle(
+                    _mouse_x, _mouse_y,
                     _left, menu_botoes_y,
                     _left + menu_botoes_largura,
-                    menu_botoes_y + menu_botoes_altura)) {
+                    menu_botoes_y + menu_botoes_altura
+                )) {
                     tela_atual = botoes_funcao[i];
                     ativo_code = false;
                     code = "";
@@ -518,27 +381,37 @@ if (mouse_check_button_pressed(mb_left)) {
         case telas.customizacao:
             for (var i = 0; i < array_length(cores_jogador); i++) {
                 var _color_left = menu_cores_x + i * (menu_cor_tamanho + menu_cor_espaco);
-                if (point_in_rectangle(_mouse_x, _mouse_y,
+                if (point_in_rectangle(
+                    _mouse_x, _mouse_y,
                     _color_left, menu_cores_y,
-                    _color_left + menu_cor_tamanho, menu_cores_y + menu_cor_tamanho)) {
+                    _color_left + menu_cor_tamanho,
+                    menu_cores_y + menu_cor_tamanho
+                )) {
                     cor_indice = i;
                     cor_atual = cores_jogador[i];
                     break;
                 }
             }
+
             for (var _char_index = 0; _char_index < array_length(sprites_personagens); _char_index++) {
                 var _col = _char_index mod 2;
                 var _row = _char_index div 2;
-                var _char_x = menu_personagens_x + _col * (menu_personagem_botao_largura + menu_personagem_botao_espaco_x);
-                var _char_y = menu_personagens_y + _row * (menu_personagem_botao_altura + menu_personagem_botao_espaco_y);
-                if (point_in_rectangle(_mouse_x, _mouse_y, _char_x, _char_y,
+                var _char_x = menu_personagens_x + _col *
+                    (menu_personagem_botao_largura + menu_personagem_botao_espaco_x);
+                var _char_y = menu_personagens_y + _row *
+                    (menu_personagem_botao_altura + menu_personagem_botao_espaco_y);
+                if (point_in_rectangle(
+                    _mouse_x, _mouse_y,
+                    _char_x, _char_y,
                     _char_x + menu_personagem_botao_largura,
-                    _char_y + menu_personagem_botao_altura)) {
+                    _char_y + menu_personagem_botao_altura
+                )) {
                     personagem_indice = _char_index;
                     personagem_atual = personagens[personagem_indice];
                     break;
                 }
             }
+
             if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
                 tela_atual = telas.menu;
                 menu_erro = "";
@@ -564,26 +437,38 @@ if (mouse_check_button_pressed(mb_left)) {
                 break;
             }
             if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
-                ativo_code = false; code = ""; keyboard_string = "";
-                tela_atual = telas.menu; menu_erro = ""; menu_mensagem = "";
+                ativo_code = false;
+                code = "";
+                keyboard_string = "";
+                tela_atual = telas.menu;
+                menu_erro = "";
+                menu_mensagem = "";
             }
         break;
 
         case telas.menu_partida_publica:
             if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
-                ativo_code = false; code = ""; keyboard_string = "";
-                tela_atual = telas.menu; menu_erro = ""; menu_mensagem = "";
+                ativo_code = false;
+                code = "";
+                keyboard_string = "";
+                tela_atual = telas.menu;
+                menu_erro = "";
+                menu_mensagem = "";
                 break;
             }
             if (point_in_rectangle(_mouse_x, _mouse_y, 190, 420, 590, 490)) {
-                ativo_code = true; keyboard_string = code;
-                menu_erro = ""; menu_mensagem = "";
+                ativo_code = true;
+                keyboard_string = code;
+                menu_erro = "";
+                menu_mensagem = "";
                 break;
             }
             if (point_in_rectangle(_mouse_x, _mouse_y, 530, 635, 750, 705)) {
                 if (_net != noone) {
-                    ativo_code = false; menu_erro = "";
-                    menu_mensagem = "Procurando partida..."; menu_aguardando = true;
+                    ativo_code = false;
+                    menu_erro = "";
+                    menu_mensagem = "Procurando partida...";
+                    menu_aguardando = true;
                     _net.net_find_public(nome_jogador, cor_atual, personagem_indice);
                 }
                 break;
@@ -594,9 +479,15 @@ if (mouse_check_button_pressed(mb_left)) {
                     var _room_info = _net.net_lobby_rooms[i];
                     var _row_top = 180 + i * 100;
                     if (point_in_rectangle(_mouse_x, _mouse_y, 850, _row_top, 1240, _row_top + 74)) {
-                        menu_erro = ""; menu_mensagem = "Entrando na partida...";
+                        menu_erro = "";
+                        menu_mensagem = "Entrando na partida...";
                         menu_aguardando = true;
-                        _net.net_join_public(_room_info.roomId, nome_jogador, cor_atual, personagem_indice);
+                        _net.net_join_public(
+                            _room_info.roomId,
+                            nome_jogador,
+                            cor_atual,
+                            personagem_indice
+                        );
                         break;
                     }
                 }
@@ -628,10 +519,13 @@ if (mouse_check_button_pressed(mb_left)) {
                     }
                 }
             }
+
             if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
                 if (_net != noone && _net.net_connected) {
                     if (_net.net_room != 0) {
-                        if (colyseus_room_is_connected(_net.net_room)) colyseus_room_leave(_net.net_room);
+                        if (colyseus_room_is_connected(_net.net_room)) {
+                            colyseus_room_leave(_net.net_room);
+                        }
                         colyseus_room_free(_net.net_room);
                     }
                     _net.net_room = 0;
@@ -660,6 +554,7 @@ if (mouse_check_button_pressed(mb_left)) {
                 menu_mensagem = "";
                 break;
             }
+
             if (_net != noone && _net.net_connected &&
                 _net.net_room_mode == "private" &&
                 _net.net_session_id == _net.net_host_session_id &&
@@ -676,8 +571,6 @@ if (mouse_check_button_pressed(mb_left)) {
 
 obj_menu draw:"/// obj_menu - Draw
 
-var _room_x = 1280;
-var _room_y = 720;
 var _mx = mouse_x;
 var _my = mouse_y;
 var _net = instance_find(obj_network_manager, 0);
@@ -689,159 +582,252 @@ draw_set_valign(fa_top);
 
 switch (tela_atual) {
 
-    // ==============================================
+    // ==================================================
     // MENU PRINCIPAL
-    // ==============================================
+    // ==================================================
     case telas.menu:
 
-        // --------------------------------------------------
-        // BARRA LATERAL ANIMADA - PIVOT TOP LEFT
-        // --------------------------------------------------
-        // Na posicao fechada, fica 2 px mais a esquerda
-        // do que antes (nenhum pixel aparece na tela).
-        // Na posicao aberta, termina exatamente em X=0.
-        var _barra_lateral_x = menu_lateral_abertura - 274 +
-            2 * (menu_lateral_abertura / 272);
+        // A barra e todos os elementos usam o MESMO X.
+        // Fechada: -275 (nenhum pixel visivel).
+        // Aberta: 0. Animacao controlada pelo Step (lerp 0.3).
+        var _painel_x = round(-275 + (menu_lateral_abertura / 272) * 275);
 
+        // --------------------------------------------------
+        // FUNDO DA LATERAL (PIVOT TOP LEFT)
+        // --------------------------------------------------
         draw_set_color(c_white);
-        draw_sprite(spr_barra_lateral, 0, _barra_lateral_x, 0);
+        draw_sprite(spr_barra_lateral, 0, _painel_x, 0);
 
         // --------------------------------------------------
-        // FOTO DE PERFIL STEAM - MANTIDA
+        // PERFIL: FOTO E NOME
         // --------------------------------------------------
+        var _perfil_foto_x = _painel_x + 22;
+        var _perfil_foto_y = 72;
+        var _perfil_foto_tamanho = 88;
+
+        // Fundo da foto
         draw_set_color(c_black);
         draw_rectangle(
-            menu_perfil_x, menu_perfil_y,
-            menu_perfil_x + menu_perfil_tamanho,
-            menu_perfil_y + menu_perfil_tamanho,
+            _perfil_foto_x,
+            _perfil_foto_y,
+            _perfil_foto_x + _perfil_foto_tamanho,
+            _perfil_foto_y + _perfil_foto_tamanho,
             false
         );
         draw_set_color(c_white);
+
+        // Avatar
         if (menu_avatar_carregado && menu_avatar_sprite != -1) {
             if (sprite_exists(menu_avatar_sprite)) {
                 var _avatar_w = sprite_get_width(menu_avatar_sprite);
                 var _avatar_h = sprite_get_height(menu_avatar_sprite);
+
                 gpu_set_texfilter(true);
                 draw_sprite_ext(
-                    menu_avatar_sprite, 0,
-                    menu_perfil_x, menu_perfil_y,
-                    menu_perfil_tamanho / _avatar_w,
-                    menu_perfil_tamanho / _avatar_h,
-                    0, c_white, 1
+                    menu_avatar_sprite,
+                    0,
+                    _perfil_foto_x,
+                    _perfil_foto_y,
+                    _perfil_foto_tamanho / _avatar_w,
+                    _perfil_foto_tamanho / _avatar_h,
+                    0,
+                    c_white,
+                    1
                 );
                 gpu_set_texfilter(false);
             }
         }
-        draw_rectangle(
-            menu_perfil_x, menu_perfil_y,
-            menu_perfil_x + menu_perfil_tamanho,
-            menu_perfil_y + menu_perfil_tamanho,
-            true
+
+        // Moldura da foto
+        draw_sprite(
+            spr_moldura,
+            0,
+            _perfil_foto_x,
+            _perfil_foto_y
+        );
+
+        // Nome do jogador
+        draw_set_font(fnt_pixelari);
+        draw_set_color(c_white);
+        draw_set_halign(fa_left);
+        draw_set_valign(fa_top);
+        draw_text_transformed(
+            _painel_x + 125,
+            75,
+            nome_jogador,
+            0.12,
+            0.12,
+            0
         );
 
         // --------------------------------------------------
-        // NOME DO JOGADOR STEAM - MANTIDO
+        // ITENS DO PAINEL: TODOS ENTRAM E SAEM JUNTO
         // --------------------------------------------------
+        draw_set_font(fnt_pixelari);
         draw_set_color(c_white);
-        draw_text_transformed(menu_nome_x, menu_nome_y, nome_jogador, 1, 1, 0);
+        draw_set_alpha(1);
 
-        // --------------------------------------------------
-        // CONTEUDO DECORATIVO DA LATERAL
-        // SOMENTE QUANDO A BARRA ESTA ATIVA E ABERTA
-        // --------------------------------------------------
-        if (menu_lateral_ativa && menu_lateral_abertura >= 270) {
-            var _painel_x = _barra_lateral_x;
-            var _painel_mouse_x = _mx - _painel_x;
+        // Perfil
+        draw_set_halign(fa_center);
+        draw_text_transformed(
+            _painel_x + 136.5,
+            20,
+            "Perfil",
+            0.18,
+            0.18,
+            0
+        );
+        draw_set_halign(fa_left);
 
-            draw_set_font(fnt_pixelari);
-            draw_set_color(c_white);
-            draw_set_halign(fa_left);
-            draw_set_valign(fa_top);
+        // Convidar amigos
+        draw_text_transformed(
+            _painel_x + 20,
+            168,
+            "Convidar Amigos",
+            0.10,
+            0.10,
+            0
+        );
 
-            // Convite de amigos - titulo igual a referencia.
-            draw_text_transformed(
-                _painel_x + 19, 168,
-                "Convidar Amigos", 0.1, 0.1, 0
-            );
+        for (var _invite_index = 0; _invite_index < 3; _invite_index++) {
+            var _invite_x = _painel_x + 22 + _invite_index * 34;
+            var _invite_y = 188;
+            var _invite_hover = false;
 
-            // Tres botoes de convite (apenas visual / hover).
-            for (var _convite_i = 0; _convite_i < 3; _convite_i++) {
-                var _convite_x = _painel_x + 23 + _convite_i * 32;
-                var _convite_y = 187;
-                var _convite_w = sprite_get_width(spr_invitefriend_button);
-                var _convite_h = sprite_get_height(spr_invitefriend_button);
-                var _convite_hover = point_in_rectangle(
-                    _mx, _my, _convite_x, _convite_y,
-                    _convite_x + _convite_w, _convite_y + _convite_h
-                );
-                draw_sprite(
-                    spr_invitefriend_button,
-                    _convite_hover ? 1 : 0,
-                    _convite_x, _convite_y
+            if (menu_lateral_ativa) {
+                _invite_hover = point_in_rectangle(
+                    _mx, _my,
+                    _invite_x, _invite_y,
+                    _invite_x + sprite_get_width(spr_invitefriend_button),
+                    _invite_y + sprite_get_height(spr_invitefriend_button)
                 );
             }
 
-            // Codigo de amigo: sem um codigo real definido ainda.
-            draw_text_transformed(
-                _painel_x + 7, 259,
-                "Codigo de amigo:", 0.1, 0.1, 0
-            );
-
-            // Botao de adicionar amigo (apenas visual / hover).
-            var _add_x = _painel_x + 7;
-            var _add_y = 290;
-            var _add_w = sprite_get_width(spr_addfriend_button);
-            var _add_h = sprite_get_height(spr_addfriend_button);
-            var _add_hover = point_in_rectangle(
-                _mx, _my, _add_x, _add_y,
-                _add_x + _add_w, _add_y + _add_h
-            );
             draw_sprite(
-                spr_addfriend_button, _add_hover ? 1 : 0,
-                _add_x, _add_y
+                spr_invitefriend_button,
+                _invite_hover ? 1 : 0,
+                _invite_x,
+                _invite_y
             );
-            // Texto sobre o botao, como no modelo.
-            draw_set_color(c_white);
-            draw_set_halign(fa_left);
-            draw_set_valign(fa_middle);
-            draw_text_transformed(
-                _add_x + 12, _add_y + _add_h / 2,
-                "Adicionar amigo...", 0.1, 0.1, 0
-            );
-            draw_set_valign(fa_top);
-
-            // Lista de amigos - vazia ate a integracao.
-            draw_set_halign(fa_center);
-            draw_text_transformed(
-                _painel_x + 136.5, 348,
-                "Lista de Amigos", 0.1, 0.1, 0
-            );
-            draw_set_halign(fa_left);
-
-            // Trilho da scrollbar no canto esquerdo da lista.
-            var _scroll_x = _painel_x + 7;
-            var _scroll_y = 383;
-            var _scroll_altura = sprite_get_height(spr_scroll_bar);
-            var _scroll_botao_altura = sprite_get_height(spr_scroll_bar_button);
-            var _trilho_altura = min(_scroll_altura, 720 - _scroll_y - 8);
-            var _scroll_escala_y = _trilho_altura / max(1, _scroll_altura);
-
-            // O trilho fica inteiro dentro da tela de 720 pixels.
-            draw_sprite_ext(
-                spr_scroll_bar, 0, _scroll_x, _scroll_y,
-                1, _scroll_escala_y, 0, c_white, 1
-            );
-
-            // Bolinha da scrollbar - arraste e roda do mouse.
-            var _percurso = max(0, _trilho_altura - _scroll_botao_altura);
-            var _bolinha_y = _scroll_y + menu_amigos_scroll * _percurso;
-            draw_sprite(spr_scroll_bar_button, 0, _scroll_x, _bolinha_y);
-
-            draw_set_font(-1);
         }
 
+        // Separador
+        draw_set_color(c_white);
+        draw_rectangle(
+            _painel_x + 2,
+            233,
+            _painel_x + 270,
+            237,
+            false
+        );
+
+        // Codigo de amigo
+        draw_set_halign(fa_left);
+        draw_text_transformed(
+            _painel_x + 7,
+            260,
+            "Codigo de amigo: ------",
+            0.10,
+            0.10,
+            0
+        );
+
+        // Botao adicionar amigo
+        var _add_x = _painel_x + 7;
+        var _add_y = 289;
+        var _add_hover = false;
+
+        if (menu_lateral_ativa) {
+            _add_hover = point_in_rectangle(
+                _mx, _my,
+                _add_x, _add_y,
+                _add_x + sprite_get_width(spr_addfriend_button),
+                _add_y + sprite_get_height(spr_addfriend_button)
+            );
+        }
+
+        draw_sprite(
+            spr_addfriend_button,
+            _add_hover ? 1 : 0,
+            _add_x,
+            _add_y
+        );
+
+        draw_set_halign(fa_left);
+        draw_text_transformed(
+            _painel_x + 17,
+            303,
+            "Adicionar amigo...",
+            0.10,
+            0.10,
+            0
+        );
+
+        // Titulo da lista de amigos (subido)
+        draw_set_halign(fa_center);
+        draw_text_transformed(
+            _painel_x + 136,
+            338,
+            "Lista de Amigos",
+            0.18,
+            0.18,
+            0
+        );
+
+        // Linha de apoio (subida)
+        draw_rectangle(
+            _painel_x + 20,
+            369,
+            _painel_x + 250,
+            373,
+            false
+        );
+
+        draw_set_halign(fa_left);
+
         // --------------------------------------------------
-        // BOTOES PRINCIPAIS - MOVIMENTO ORIGINAL
+        // SCROLLBAR E BOLINHA
+        // --------------------------------------------------
+        var _scroll_x = _painel_x + 7;
+        var _scroll_y = 395;
+        var _scroll_altura = 310;
+        var _scroll_largura = sprite_get_width(spr_scroll_bar);
+        var _scroll_escala_y = _scroll_altura / max(1, sprite_get_height(spr_scroll_bar));
+
+        draw_sprite_ext(
+            spr_scroll_bar,
+            0,
+            _scroll_x,
+            _scroll_y,
+            1,
+            _scroll_escala_y,
+            0,
+            c_white,
+            1
+        );
+
+        var _scroll_btn_altura = sprite_get_height(spr_scroll_bar_button);
+        var _scroll_btn_largura = sprite_get_width(spr_scroll_bar_button);
+        var _scroll_btn_escala_x = _scroll_largura / max(1, _scroll_btn_largura);
+        var _scroll_btn_y = _scroll_y +
+            max(0, _scroll_altura - _scroll_btn_altura) * menu_lateral_scroll_ratio;
+
+        draw_sprite_ext(
+            spr_scroll_bar_button,
+            0,
+            _scroll_x,
+            _scroll_btn_y,
+            _scroll_btn_escala_x,
+            1,
+            0,
+            c_white,
+            1
+        );
+
+        draw_set_font(-1);
+
+        // --------------------------------------------------
+        // BOTOES PRINCIPAIS
         // --------------------------------------------------
         for (var i = 0; i < array_length(botoes_menu); i++) {
             var _left = menu_botoes_x + menu_botoes_deslocamento +
@@ -851,72 +837,102 @@ switch (tela_atual) {
             var _bottom = _top + menu_botoes_altura;
 
             draw_set_color(c_white);
+
             if (point_in_rectangle(_mx, _my, _left, _top, _right, _bottom)) {
                 draw_set_color(c_lime);
             }
+
             draw_rectangle(_left, _top, _right, _bottom, true);
+
             draw_set_color(c_white);
             draw_set_halign(fa_center);
             draw_set_valign(fa_middle);
             draw_text_transformed(
                 _left + menu_botoes_largura / 2,
                 _top + menu_botoes_altura / 2,
-                botoes_menu[i], 1, 1, 0
+                botoes_menu[i],
+                1,
+                1,
+                0
             );
             draw_set_halign(fa_left);
             draw_set_valign(fa_top);
         }
     break;
 
-    // ==============================================
+    // ==================================================
     // CUSTOMIZACAO
-    // ==============================================
+    // ==================================================
     case telas.customizacao:
         draw_set_color(c_white);
         draw_set_halign(fa_center);
         draw_text_transformed(640, 35, "Customizacao", 2, 2, 0);
         draw_set_halign(fa_left);
 
-        draw_set_color(c_white);
         draw_text_transformed(menu_cores_x, menu_cores_y - 42, "Escolha sua cor:", 1, 1, 0);
+
         for (var i = 0; i < array_length(cores_jogador); i++) {
             var _color_x = menu_cores_x + i * (menu_cor_tamanho + menu_cor_espaco);
+
             draw_set_color(cores_draw[i]);
-            draw_rectangle(_color_x, menu_cores_y,
+            draw_rectangle(
+                _color_x,
+                menu_cores_y,
                 _color_x + menu_cor_tamanho,
-                menu_cores_y + menu_cor_tamanho, false);
+                menu_cores_y + menu_cor_tamanho,
+                false
+            );
+
             if (i == cor_indice) {
                 draw_set_color(c_white);
-                draw_rectangle(_color_x - 2, menu_cores_y - 2,
+                draw_rectangle(
+                    _color_x - 2,
+                    menu_cores_y - 2,
                     _color_x + menu_cor_tamanho + 2,
-                    menu_cores_y + menu_cor_tamanho + 2, true);
+                    menu_cores_y + menu_cor_tamanho + 2,
+                    true
+                );
             }
         }
 
         draw_set_color(c_white);
-        draw_text_transformed(menu_personagens_titulo_x,
-            menu_personagens_titulo_y - 42, "Escolha seu personagem:", 1, 1, 0);
+        draw_text_transformed(
+            menu_personagens_titulo_x,
+            menu_personagens_titulo_y - 42,
+            "Escolha seu personagem:",
+            1,
+            1,
+            0
+        );
 
         for (var _char_index = 0; _char_index < array_length(sprites_personagens); _char_index++) {
             var _col = _char_index mod 2;
             var _row = _char_index div 2;
-            var _botao_x = menu_personagens_x + _col *
-                (menu_personagem_botao_largura + menu_personagem_botao_espaco_x);
-            var _botao_y = menu_personagens_y + _row *
-                (menu_personagem_botao_altura + menu_personagem_botao_espaco_y);
+
+            var _botao_x = menu_personagens_x +
+                _col * (menu_personagem_botao_largura + menu_personagem_botao_espaco_x);
+            var _botao_y = menu_personagens_y +
+                _row * (menu_personagem_botao_altura + menu_personagem_botao_espaco_y);
             var _botao_x2 = _botao_x + menu_personagem_botao_largura;
             var _botao_y2 = _botao_y + menu_personagem_botao_altura;
-            var _selecionado = (_char_index == personagem_indice);
 
             draw_set_color(c_white);
+
             if (point_in_rectangle(_mx, _my, _botao_x, _botao_y, _botao_x2, _botao_y2)) {
                 draw_set_color(c_lime);
             }
+
             draw_rectangle(_botao_x, _botao_y, _botao_x2, _botao_y2, true);
-            if (_selecionado) {
+
+            if (_char_index == personagem_indice) {
                 draw_set_color(c_yellow);
-                draw_rectangle(_botao_x - 3, _botao_y - 3,
-                    _botao_x2 + 3, _botao_y2 + 3, true);
+                draw_rectangle(
+                    _botao_x - 3,
+                    _botao_y - 3,
+                    _botao_x2 + 3,
+                    _botao_y2 + 3,
+                    true
+                );
             }
 
             var _spr = sprites_personagens[_char_index];
@@ -924,24 +940,43 @@ switch (tela_atual) {
             var _spr_h = sprite_get_height(_spr);
             var _spr_origin_x = sprite_get_xoffset(_spr);
             var _spr_origin_y = sprite_get_yoffset(_spr);
+
             var _escala = min(
-                (menu_personagem_botao_largura * 0.70) / _spr_w,
-                (menu_personagem_botao_altura * 0.70) / _spr_h
+                menu_personagem_botao_largura * 0.70 / _spr_w,
+                menu_personagem_botao_altura * 0.70 / _spr_h
             );
+
             var _centro_x = _botao_x + menu_personagem_botao_largura / 2;
             var _centro_y = _botao_y + menu_personagem_botao_altura / 2;
+
             var _draw_x = _centro_x + (_spr_origin_x - _spr_w / 2) * _escala;
             var _draw_y = _centro_y + (_spr_origin_y - _spr_h / 2) * _escala;
+
             draw_set_color(c_white);
-            draw_sprite_ext(_spr, 0, _draw_x, _draw_y,
-                _escala, _escala, 0, c_white, 1);
+            draw_sprite_ext(
+                _spr,
+                0,
+                _draw_x,
+                _draw_y,
+                _escala,
+                _escala,
+                0,
+                c_white,
+                1
+            );
         }
+
         draw_set_color(c_white);
-        draw_text_transformed(menu_personagens_x,
+        draw_text_transformed(
+            menu_personagens_x,
             menu_personagens_y + menu_personagem_botao_altura * 2 +
             menu_personagem_botao_espaco_y + 20,
             "Personagem " + string(personagem_indice + 1) + " / " +
-            string(array_length(personagens)), 1, 1, 0);
+            string(array_length(personagens)),
+            1,
+            1,
+            0
+        );
 
         draw_set_color(c_white);
         if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
@@ -950,28 +985,33 @@ switch (tela_atual) {
         draw_text_transformed(30, 655, "Voltar", 1, 1, 0);
     break;
 
-    // ==============================================
-    // MENU PRIVADO
-    // ==============================================
+    // ==================================================
+    // PARTIDA PRIVADA
+    // ==================================================
     case telas.menu_partida_privada:
         draw_set_color(c_white);
+
         if (point_in_rectangle(_mx, _my, 440, 120, 840, 230)) draw_set_color(c_lime);
         draw_rectangle(440, 120, 840, 230, true);
+
         draw_set_halign(fa_center);
         draw_text_transformed(640, 160, "Criar Partida", 2, 2, 0);
-
         draw_set_color(c_white);
         draw_text_transformed(640, 305, "Digite o codigo", 2, 2, 0);
+
         if (ativo_code) draw_set_color(c_lime);
         draw_rectangle(440, 350, 840, 460, true);
+
         draw_set_color(c_white);
         if (code == "") {
             draw_set_alpha(0.5);
             draw_text_transformed(640, 390, "Codigo da sala...", 2, 2, 0);
             draw_set_alpha(1);
-        } else {
+        }
+        else {
             draw_text_transformed(640, 390, code, 2, 2, 0);
         }
+
         draw_set_halign(fa_left);
         draw_set_color(c_white);
         if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
@@ -980,145 +1020,175 @@ switch (tela_atual) {
         draw_text_transformed(30, 655, "Voltar", 1, 1, 0);
     break;
 
-    // ==============================================
-    // MENU PUBLICO
-    // ==============================================
+    // ==================================================
+    // PARTIDA PUBLICA
+    // ==================================================
     case telas.menu_partida_publica:
         draw_set_color(c_white);
+
         if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
         draw_rectangle(20, 635, 300, 705, true);
         draw_set_color(c_white);
         draw_text_transformed(30, 655, "Voltar", 1, 1, 0);
 
-        draw_set_color(c_white);
         if (point_in_rectangle(_mx, _my, 530, 635, 750, 705)) draw_set_color(c_lime);
         draw_rectangle(530, 635, 750, 705, true);
-        draw_set_halign(fa_center);
         draw_set_color(c_white);
+
+        draw_set_halign(fa_center);
         draw_text_transformed(640, 655, "Procurar Partida", 1, 1, 0);
         draw_text_transformed(390, 375, "Entrar por codigo", 1, 1, 0);
+
         if (ativo_code) draw_set_color(c_lime);
         draw_rectangle(190, 420, 590, 490, true);
+
         draw_set_color(c_white);
         if (code == "") {
             draw_set_alpha(0.5);
             draw_text_transformed(390, 443, "Codigo da sala...", 1, 1, 0);
             draw_set_alpha(1);
-        } else {
+        }
+        else {
             draw_text_transformed(390, 443, code, 1, 1, 0);
         }
+
         draw_text_transformed(1045, 115, "Partidas Encontradas", 1, 1, 0);
         draw_rectangle(840, 165, 1250, 580, true);
+
         if (_net != noone) {
             var _visible_count = min(array_length(_net.net_lobby_rooms), 4);
+
             for (var i = 0; i < _visible_count; i++) {
                 var _room_info = _net.net_lobby_rooms[i];
                 var _row_top = 180 + i * 100;
+
                 draw_set_color(c_white);
                 if (point_in_rectangle(_mx, _my, 850, _row_top, 1240, _row_top + 74)) {
                     draw_set_color(c_lime);
                 }
+
                 draw_rectangle(850, _row_top, 1240, _row_top + 74, true);
+
                 draw_set_color(c_white);
                 draw_set_halign(fa_left);
-                draw_text_transformed(865, _row_top + 8,
-                    "Sala: " + _room_info.roomId, 1, 1, 0);
-                draw_text_transformed(865, _row_top + 40,
-                    string(_room_info.clients) + " / " +
-                    string(_room_info.maxClients) + " jogadores", 1, 1, 0);
+                draw_text_transformed(865, _row_top + 8, "Sala: " + _room_info.roomId, 1, 1, 0);
+                draw_text_transformed(
+                    865,
+                    _row_top + 40,
+                    string(_room_info.clients) + " / " + string(_room_info.maxClients) + " jogadores",
+                    1,
+                    1,
+                    0
+                );
+
                 for (var j = 0; j < 4; j++) {
                     var _has_player = j < _room_info.clients;
-                    draw_sprite_ext(spr_players_icon, _has_player,
-                        1100 + j * 25, _row_top + 42, 1, 1, 0, c_white, 1);
+                    draw_sprite_ext(
+                        spr_players_icon,
+                        _has_player,
+                        1100 + j * 25,
+                        _row_top + 42,
+                        1,
+                        1,
+                        0,
+                        c_white,
+                        1
+                    );
                 }
             }
         }
     break;
 
-    // ==============================================
+    // ==================================================
     // LOBBY
-    // ==============================================
+    // ==================================================
     case telas.lobby:
         draw_set_color(c_white);
         draw_set_halign(fa_center);
         draw_text_transformed(640, 20, "Lobby", 2, 2, 0);
-        draw_text_transformed(640, 75,
-            "Codigo da sala: " + codigo_sala_privada, 1, 1, 0);
-        draw_text_transformed(640, 110,
-            "Jogadores: " + string(qtd_players) + " / 4", 1, 1, 0);
+        draw_text_transformed(640, 75, "Codigo da sala: " + codigo_sala_privada, 1, 1, 0);
+        draw_text_transformed(640, 110, "Jogadores: " + string(qtd_players) + " / 4", 1, 1, 0);
         draw_set_halign(fa_left);
         draw_text_transformed(20, 125, "Escolha sua cor:", 1, 1, 0);
+
         for (var i = 0; i < array_length(cores_jogador); i++) {
             var _color_left = 20 + i * 60;
             var _color_top = 150;
-            var _color_right = _color_left + 50;
-            var _color_bottom = 200;
             var _color_occupied = false;
+
             if (_net != noone) {
                 for (var j = 0; j < array_length(_net.net_players); j++) {
-                    var _player_color = colyseus_schema_get(
-                        _net.net_players[j].schema, "color");
+                    var _player_color = colyseus_schema_get(_net.net_players[j].schema, "color");
                     if (_player_color == cores_jogador[i]) {
                         _color_occupied = true;
                         break;
                     }
                 }
             }
+
             draw_set_alpha(1);
             draw_set_color(cores_draw[i]);
-            draw_rectangle(_color_left, _color_top, _color_right, _color_bottom, false);
+            draw_rectangle(_color_left, _color_top, _color_left + 50, 200, false);
+
             if (_color_occupied) {
                 draw_set_color(c_black);
                 draw_set_alpha(0.8);
-                draw_rectangle(_color_left, _color_top, _color_right, _color_bottom, false);
+                draw_rectangle(_color_left, _color_top, _color_left + 50, 200, false);
             }
         }
+
         draw_set_alpha(1);
         draw_set_color(c_white);
-        var _player_x = -250;
+
         for (var i = 0; i < 4; i++) {
-            var _box_left = 640 + _player_x + i * 140;
+            var _box_left = 390 + i * 140;
             var _box_right = _box_left + 100;
+
             draw_rectangle(_box_left, 360, _box_right, 560, true);
+
             var _player_name = "Aguardando...";
             var _has_player = false;
             var _box_player_color = "";
+
             if (_net != noone && i < array_length(_net.net_players)) {
                 _has_player = true;
                 _player_name = _net.net_players[i].name;
-                _box_player_color = colyseus_schema_get(
-                    _net.net_players[i].schema, "color");
+                _box_player_color = colyseus_schema_get(_net.net_players[i].schema, "color");
             }
+
             if (_has_player) {
                 var _box_color = c_red;
+
                 switch (_box_player_color) {
                     case "red": _box_color = c_red; break;
                     case "blue": _box_color = c_blue; break;
                     case "green": _box_color = c_green; break;
                     case "yellow": _box_color = c_yellow; break;
                 }
+
                 draw_set_color(_box_color);
                 draw_rectangle(_box_left, 360, _box_right, 372, false);
             }
+
             draw_set_color(c_white);
             draw_set_halign(fa_center);
             draw_text_transformed(_box_left + 50, 435, _player_name, 1, 1, 0);
             draw_set_halign(fa_left);
         }
+
         draw_set_color(c_white);
         if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
         draw_rectangle(20, 635, 300, 705, true);
         draw_set_color(c_white);
         draw_set_halign(fa_center);
         draw_text_transformed(160, 655, "Sair do lobby", 1, 1, 0);
+
         if (_net != noone && _net.net_connected &&
             _net.net_room_mode == "private" &&
             _net.net_session_id == _net.net_host_session_id &&
             array_length(_net.net_players) >= 2) {
             draw_set_color(c_white);
-            if (point_in_rectangle(_mx, _my, 540, 635, 740, 705)) {
-                draw_set_color(c_lime);
-            }
+            if (point_in_rectangle(_mx, _my, 540, 635, 740, 705)) draw_set_color(c_lime);
             draw_rectangle(540, 635, 740, 705, true);
             draw_set_color(c_white);
             draw_text_transformed(640, 655, "Iniciar partida", 1, 1, 0);
@@ -1127,25 +1197,3283 @@ switch (tela_atual) {
 }
 
 // --------------------------------------------------
-// MENSAGENS DO MENU
+// MENSAGENS COMUNS
 // --------------------------------------------------
 draw_set_alpha(1);
 draw_set_color(c_white);
 draw_set_halign(fa_center);
+
 if (menu_mensagem != "") {
     draw_text_transformed(640, 605, menu_mensagem, 1, 1, 0);
 }
+
 if (menu_erro != "") {
     draw_set_color(c_red);
     draw_text_transformed(640, 580, menu_erro, 1, 1, 0);
 }
 
-// --------------------------------------------------
-// RESTAURAR CONFIGURACOES
-// --------------------------------------------------
 draw_set_alpha(1);
 draw_set_color(c_white);
 draw_set_halign(fa_left);
 draw_set_valign(fa_top);
-draw_set_font(-1);
+draw_set_font(-1);"
+obj_menu clean uo:"
+/// obj_menu - Clean Up
+
+if (menu_avatar_sprite != -1) {
+
+    if (sprite_exists(menu_avatar_sprite)) {
+        sprite_delete(menu_avatar_sprite);
+    }
+
+    menu_avatar_sprite = -1;
+}
+
+menu_avatar_carregado = false;
 "
+obj_netowork_manager create:"
+/// obj_network_manager - Create
+
+net_players = [];
+net_callbacks = 0;
+
+persistent = true;
+
+// Estado da conexão
+net_connected = false;
+net_busy = false;
+net_status = "Conectando ao servidor...";
+net_error = "";
+
+// Estado da partida
+net_host_session_id = "";
+net_game_status = "waiting";
+net_game_started = false;
+
+// Modalidade da sala
+net_room_mode = "";
+
+// Contagem automática das partidas públicas
+net_auto_start_countdown = 0;
+
+// Dados do tabuleiro recebidos do servidor
+net_board_data = [];
+net_board_data_received = false;
+net_board_data_version = 0;
+
+// Cores
+net_selected_color = "red";
+net_player_color = "red";
+
+//net_client = colyseus_client_create("http://localhost:2567");
+net_client = colyseus_client_create("http://26.3.118.45:2567");
+
+net_room = 0;
+net_lobby_room = 0;
+
+net_room_id = "";
+net_session_id = "";
+
+net_lobby_rooms = [];
+
+
+// --------------------------------------------------
+// REGISTRAR UMA SALA DE JOGO
+// --------------------------------------------------
+
+net_register_room = function(_room) {
+
+    net_room = _room;
+    net_busy = true;
+    net_connected = false;
+
+    net_host_session_id = "";
+    net_game_status = "waiting";
+    net_game_started = false;
+    net_auto_start_countdown = 0;
+
+    // Reiniciar dados do tabuleiro ao entrar em outra sala.
+    net_board_data = [];
+    net_board_data_received = false;
+    net_board_data_version = 0;
+
+    colyseus_on_join(_room, function(_joined_room) {
+
+        net_connected = true;
+        net_busy = false;
+        net_status = "Conectado!";
+        net_error = "";
+
+        net_room_id = colyseus_room_get_id(_joined_room);
+        net_session_id = colyseus_room_get_session_id(_joined_room);
+
+        net_players = [];
+
+        net_callbacks = colyseus_callbacks_create(_joined_room);
+
+        var _state = colyseus_room_get_state(_joined_room);
+
+        if (_state != undefined) {
+
+            var _host_id = colyseus_schema_get(
+                _state,
+                "hostSessionId"
+            );
+
+            if (is_undefined(_host_id)) {
+                net_host_session_id = "";
+            }
+            else {
+                net_host_session_id = _host_id;
+            }
+
+            net_game_status = colyseus_schema_get(
+                _state,
+                "status"
+            );
+
+            net_game_started = (net_game_status == "playing");
+
+            var _countdown = colyseus_schema_get(
+                _state,
+                "autoStartCountdown"
+            );
+
+            if (is_undefined(_countdown)) {
+                net_auto_start_countdown = 0;
+            }
+            else {
+                net_auto_start_countdown = _countdown;
+            }
+        }
+
+        colyseus_listen(
+            net_callbacks,
+            "hostSessionId",
+            function(_value, _previous) {
+
+                if (is_undefined(_value)) {
+                    net_host_session_id = "";
+                }
+                else {
+                    net_host_session_id = _value;
+                }
+            }
+        );
+
+        colyseus_listen(
+            net_callbacks,
+            "status",
+            function(_value, _previous) {
+
+                net_game_status = _value;
+
+                if (_value == "playing") {
+                    net_game_started = true;
+                }
+            }
+        );
+
+        colyseus_listen(
+            net_callbacks,
+            "autoStartCountdown",
+            function(_value, _previous) {
+
+                if (is_undefined(_value)) {
+                    net_auto_start_countdown = 0;
+                }
+                else {
+                    net_auto_start_countdown = _value;
+                }
+            }
+        );
+
+        // Observar jogadores adicionados.
+        colyseus_on_add(
+            net_callbacks,
+            "players",
+            function(_instance, _key) {
+
+                var _player_name = colyseus_schema_get(
+                    _instance,
+                    "name"
+                );
+
+                var _player_color = colyseus_schema_get(
+                    _instance,
+                    "color"
+                );
+
+                if (is_undefined(_player_color) || _player_color == "") {
+                    _player_color = "red";
+                }
+
+                var _player_data = {
+                    session_id: _key,
+                    name: _player_name,
+                    color: _player_color,
+                    schema: _instance
+                };
+
+                net_players[array_length(net_players)] = _player_data;
+
+                if (_key == net_session_id) {
+                    net_player_color = _player_color;
+                }
+
+                show_debug_message(
+                    "PLAYER ADICIONADO | ID: " + string(_key) +
+                    " | NOME: " + string(_player_name) +
+                    " | COR: " + string(_player_color)
+                );
+
+                show_debug_message(
+                    "TOTAL APOS ADICAO: " +
+                    string(array_length(net_players))
+                );
+            }
+        );
+
+        // Observar jogadores removidos.
+        colyseus_on_remove(
+            net_callbacks,
+            "players",
+            function(_instance, _key) {
+
+                show_debug_message("=== ANTES DA REMOCAO ===");
+
+                show_debug_message(
+                    "ID REMOVIDO: " + string(_key)
+                );
+
+                show_debug_message(
+                    "TOTAL ANTES: " +
+                    string(array_length(net_players))
+                );
+
+                for (var i = 0; i < array_length(net_players); i++) {
+
+                    show_debug_message(
+                        "JOGADOR " + string(i) +
+                        " | ID: " + string(net_players[i].session_id) +
+                        " | NOME: " + string(net_players[i].name)
+                    );
+                }
+
+                var _remaining_players = [];
+
+                for (var j = 0; j < array_length(net_players); j++) {
+
+                    if (net_players[j].session_id != _key) {
+
+                        _remaining_players[
+                            array_length(_remaining_players)
+                        ] = net_players[j];
+                    }
+                }
+
+                net_players = _remaining_players;
+
+                show_debug_message(
+                    "PLAYER REMOVIDO | ID: " + string(_key)
+                );
+
+                show_debug_message("=== JOGADORES RESTANTES ===");
+
+                for (var k = 0; k < array_length(net_players); k++) {
+
+                    show_debug_message(
+                        string(net_players[k].session_id) + " | " +
+                        string(net_players[k].name)
+                    );
+                }
+
+                show_debug_message(
+                    "TOTAL: " + string(array_length(net_players))
+                );
+
+                show_debug_message("===========================");
+            }
+        );
+
+        // Receber mensagens do servidor.
+        colyseus_on_message(
+            _joined_room,
+            function(_room_message, _type, _data) {
+
+                // ------------------------------------------
+                // ERRO DE COR
+                // ------------------------------------------
+
+                if (_type == "color_error") {
+
+                    net_error = string(_data);
+                }
+
+                // ------------------------------------------
+                // DADOS DO TABULEIRO
+                // ------------------------------------------
+
+                else if (_type == "board_data") {
+
+                    var _parsed_data = undefined;
+
+                    // O servidor envia os dados como JSON string.
+                    if (is_string(_data)) {
+
+                        _parsed_data = json_parse(_data);
+                    }
+                    else {
+
+                        _parsed_data = _data;
+                    }
+
+                    if (is_array(_parsed_data)) {
+
+                        net_board_data = _parsed_data;
+                        net_board_data_received = true;
+
+                        // Registrar nova versão do tabuleiro.
+                        net_board_data_version++;
+
+                        show_debug_message(
+                            "DADOS DO TABULEIRO RECEBIDOS | VERSÃO: " +
+                            string(net_board_data_version)
+                        );
+
+                        show_debug_message(
+                            "QUANTIDADE DE CASAS: " +
+                            string(array_length(net_board_data))
+                        );
+
+                    }
+                    else {
+
+                        show_debug_message(
+                            "ERRO AO CONVERTER board_data. Tipo recebido: " +
+                            typeof(_data)
+                        );
+                    }
+                }
+            }
+        );
+
+        show_debug_message("=== SALA CONECTADA ===");
+        show_debug_message("Sala: " + net_room_id);
+        show_debug_message("Sessão: " + net_session_id);
+        show_debug_message("Líder: " + string(net_host_session_id));
+        show_debug_message("Modalidade: " + net_room_mode);
+    });
+
+    colyseus_on_error(_room, function(_code, _message) {
+
+        net_connected = false;
+        net_busy = false;
+        net_status = "Erro ao entrar na sala";
+        net_error = _message;
+
+        show_debug_message("ERRO COLYSEUS [" + string(_code) + "]");
+        show_debug_message(_message);
+    });
+};
+
+
+// --------------------------------------------------
+// CRIAR PARTIDA PRIVADA
+// --------------------------------------------------
+
+
+/// obj_network_manager - net_create_private
+
+net_create_private = function(_player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    var _steam = instance_find(obj_steam, 0);
+
+    if (_steam == noone || _steam.steam_player_id_string == "") {
+        net_error = "Nao foi possivel obter sua identidade Steam.";
+        return;
+    }
+
+    _player_name = _steam.steam_player_name;
+
+    net_room_mode = "private";
+    net_selected_color = _player_color;
+
+    var _options = {
+        mode: "private",
+        playerName: _player_name,
+        steamId: _steam.steam_player_id_string,
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Criando partida privada...";
+    net_error = "";
+
+    var _new_room = colyseus_client_create_room(
+        net_client,
+        "my_room",
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+// --------------------------------------------------
+// ENTRAR EM PARTIDA PRIVADA PELO CÓDIGO
+// --------------------------------------------------
+
+
+/// obj_network_manager - net_join_private
+
+net_join_private = function(_room_id, _player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    if (string_length(string_trim(_room_id)) != 6) {
+        net_error = "O código deve ter 6 caracteres.";
+        return;
+    }
+
+    var _steam = instance_find(obj_steam, 0);
+
+    if (_steam == noone || _steam.steam_player_id_string == "") {
+        net_error = "Nao foi possivel obter sua identidade Steam.";
+        return;
+    }
+
+    _player_name = _steam.steam_player_name;
+
+    net_room_mode = "private";
+    net_selected_color = _player_color;
+
+    var _options = {
+        playerName: _player_name,
+        steamId: _steam.steam_player_id_string,
+        mode: "private",
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Verificando sala privada...";
+    net_error = "";
+
+    var _new_room = colyseus_client_join_by_id(
+        net_client,
+        string_trim(_room_id),
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+// --------------------------------------------------
+// PROCURAR PARTIDA PÚBLICA ALEATÓRIA
+// --------------------------------------------------
+
+
+/// obj_network_manager - net_find_public
+
+net_find_public = function(_player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    var _steam = instance_find(obj_steam, 0);
+
+    if (_steam == noone || _steam.steam_player_id_string == "") {
+        net_error = "Nao foi possivel obter sua identidade Steam.";
+        return;
+    }
+
+    _player_name = _steam.steam_player_name;
+
+    net_room_mode = "public";
+    net_selected_color = _player_color;
+
+    var _options = {
+        mode: "public",
+        playerName: _player_name,
+        steamId: _steam.steam_player_id_string,
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Procurando partida...";
+    net_error = "";
+
+    var _new_room = colyseus_client_join_or_create(
+        net_client,
+        "my_room",
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+
+// --------------------------------------------------
+// ENTRAR EM UMA PARTIDA PÚBLICA ESPECÍFICA
+// --------------------------------------------------
+
+
+/// obj_network_manager - net_join_public
+
+net_join_public = function(_room_id, _player_name, _player_color, _player_character) {
+
+    if (net_busy || net_connected) return;
+
+    if (string_length(string_trim(_room_id)) != 6) {
+        net_error = "O código deve ter 6 caracteres.";
+        return;
+    }
+
+    var _steam = instance_find(obj_steam, 0);
+
+    if (_steam == noone || _steam.steam_player_id_string == "") {
+        net_error = "Nao foi possivel obter sua identidade Steam.";
+        return;
+    }
+
+    _player_name = _steam.steam_player_name;
+
+    net_room_mode = "public";
+    net_selected_color = _player_color;
+
+    var _options = {
+        playerName: _player_name,
+        steamId: _steam.steam_player_id_string,
+        mode: "public",
+        selectedColor: _player_color,
+        selectedCharacter: _player_character
+    };
+
+    net_status = "Verificando sala pública...";
+    net_error = "";
+
+    var _new_room = colyseus_client_join_by_id(
+        net_client,
+        string_trim(_room_id),
+        json_stringify(_options)
+    );
+
+    net_register_room(_new_room);
+};
+
+
+
+// --------------------------------------------------
+// CONECTAR AO DIRETÓRIO DE PARTIDAS COLYSEUS
+// --------------------------------------------------
+
+net_connect_lobby = function() {
+
+    net_lobby_rooms = [];
+
+    net_lobby_room = colyseus_client_join_or_create(
+        net_client,
+        "lobby",
+        "{}"
+    );
+
+    colyseus_on_join(net_lobby_room, function(_room) {
+
+        show_debug_message("=== DIRETORIO CONECTADO ===");
+    });
+
+    colyseus_on_error(net_lobby_room, function(_code, _message) {
+
+        show_debug_message(
+            "ERRO NO DIRETORIO [" +
+            string(_code) + "]: " + _message
+        );
+    });
+
+    colyseus_on_message(
+        net_lobby_room,
+        function(_room, _type, _data) {
+
+            if (_type == "rooms_begin") {
+
+                net_lobby_rooms = [];
+            }
+            else if (_type == "public_room") {
+
+                if (is_struct(_data)) {
+
+                    var _found = false;
+
+                    for (var i = 0; i < array_length(net_lobby_rooms); i++) {
+
+                        if (net_lobby_rooms[i].roomId == _data.roomId) {
+
+                            net_lobby_rooms[i] = _data;
+                            _found = true;
+                            break;
+                        }
+                    }
+
+                    if (!_found) {
+
+                        net_lobby_rooms[
+                            array_length(net_lobby_rooms)
+                        ] = _data;
+                    }
+
+                    show_debug_message(
+                        "PARTIDA RECEBIDA: " + _data.roomId
+                    );
+
+                } else {
+
+                    show_debug_message(
+                        "ERRO: Dados da partida não são um struct."
+                    );
+                }
+            }
+            else if (_type == "rooms_end") {
+
+                show_debug_message(
+                    "TOTAL DE PARTIDAS: " +
+                    string(array_length(net_lobby_rooms))
+                );
+            }
+        }
+    );
+};
+
+
+// --------------------------------------------------
+// INICIAR A LISTAGEM PÚBLICA
+// --------------------------------------------------
+
+net_connect_lobby();
+"
+obj_netowork_manager clean up:"/// obj_network_manager - Clean Up
+
+if (net_room != 0) {
+    colyseus_room_leave(net_room);
+    colyseus_room_free(net_room);
+}
+
+if (net_lobby_room != 0) {
+    colyseus_room_leave(net_lobby_room);
+    colyseus_room_free(net_lobby_room);
+}
+
+if (net_client != 0) {
+    colyseus_client_free(net_client);
+}"
+obj_netowork_manager step:"/// obj_network_manager - Step
+
+// Processar eventos e atualizações do Colyseus.
+colyseus_process();"
+obj_steam create:"
+/// obj_steam - Create
+
+// --------------------------------------------------
+// REINICIALIZAÇÃO DO JOGO
+// --------------------------------------------------
+
+is_game_restarting = false;
+
+randomize();
+
+#macro SteamLeaderboard "YYLeaderboard_10/29/21--"
+
+// --------------------------------------------------
+// IDENTIDADE STEAM
+// --------------------------------------------------
+
+steam_player_name = "";
+steam_player_id = -1;
+steam_player_id_string = "";
+
+handle = -1;
+
+// --------------------------------------------------
+// SISTEMA DE CARREGAMENTO
+// --------------------------------------------------
+
+steam_load_state = 0;
+steam_load_message = "Verificando conexão com a Steam...";
+steam_load_timer = 0;
+
+// --------------------------------------------------
+// VERIFICAR CONEXÃO COM A STEAM
+// --------------------------------------------------
+
+if (steam_api_is_initialized()) {
+
+    steam_player_name = steam_friends_get_persona_name();
+
+    var _steam_id_value = steam_user_get_steam_id();
+
+    steam_player_id = _steam_id_value;
+
+    // Converter o Steam ID para texto, preservando
+    // o tipo Int64 quando disponibilizado pela extensão.
+    steam_player_id_string = string(int64(_steam_id_value));
+
+    show_debug_message("==================================");
+    show_debug_message("STEAM CONECTADA!");
+    show_debug_message("NOME: " + steam_player_name);
+    show_debug_message("STEAM ID: " + steam_player_id_string);
+    show_debug_message("TIPO DO ID: " + typeof(_steam_id_value));
+    show_debug_message("ID É INT64: " + string(is_int64(_steam_id_value)));
+    show_debug_message("==================================");
+
+    steam_load_state = 1;
+    steam_load_message = "Carregando...";
+    steam_load_timer = room_speed;
+
+} else {
+
+    var _steam_error = steam_api_last_error();
+
+    show_debug_message("FALHA AO INICIALIZAR A STEAM:");
+    show_debug_message(_steam_error);
+
+    steam_load_state = -1;
+
+    if (_steam_error == "") {
+        _steam_error = "Motivo desconhecido. Verifique o cliente Steam e o Application ID.";
+    }
+
+    steam_load_message =
+        "Nao foi possivel conectar a sua conta Steam.\n\n" +
+        "Abra o Steam, entre na sua conta e tente novamente.\n\n" +
+        "Detalhes do erro:\n" +
+        _steam_error;
+}
+"
+obj_steam step:"
+/// obj_steam - Step
+
+// --------------------------------------------------
+// ATUALIZAR CALLBACKS DA STEAM
+// --------------------------------------------------
+
+steam_api_run_callbacks();
+
+// --------------------------------------------------
+// CONTAGEM DO CARREGAMENTO
+// --------------------------------------------------
+
+if (steam_load_state == 1) {
+
+    steam_load_timer--;
+
+    if (steam_load_timer <= 0) {
+
+        steam_load_state = 2;
+
+        room_goto(rm_menu);
+    }
+}
+"
+obj_steam end step:"
+/// obj_steam - End Step
+
+// --------------------------------------------------
+// MANTER O NOME DA STEAM NO MENU
+// --------------------------------------------------
+
+if (steam_load_state == 2 && steam_player_name != "") {
+
+    var _menu = instance_find(obj_menu, 0);
+
+    if (_menu != noone) {
+
+        _menu.nome_jogador = steam_player_name;
+    }
+}
+"
+
+obj_steam draw gui:"
+/// obj_steam - Draw GUI
+
+// --------------------------------------------------
+// DIMENSÕES DA GUI
+// --------------------------------------------------
+
+var _gui_w = display_get_gui_width();
+var _gui_h = display_get_gui_height();
+
+var _gui_center_x = _gui_w / 2;
+var _gui_center_y = _gui_h / 2;
+
+// --------------------------------------------------
+// DESENHAR MENSAGEM
+// --------------------------------------------------
+
+if (steam_load_state == 1 || steam_load_state == -1) {
+
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+
+    draw_text_ext(
+        _gui_center_x,
+        _gui_center_y,
+        steam_load_message,
+        8,
+        _gui_w * 0.8
+    );
+
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_alpha(1);
+    draw_set_color(c_white);
+}
+"
+
+myroom:"import { Room, Client, CloseCode, Delayed, ServerError } from "colyseus";
+import { MyRoomState, Player } from "./schema/MyRoomState.js";
+
+const TURN_DURATION = 15_000;
+const BOARD_SIZE = 32;
+const AUTO_START_DURATION = 10;
+const GAME_START_DELAY = 3_000;
+const FIRST_PLAYER_MESSAGE_DURATION = 4_000;
+const EXTRA_ROLL_MESSAGE_DURATION = 3_000;
+const PRISON_MESSAGE_DURATION = 3_000;
+const TRIPLE_DOUBLES_MESSAGE_DURATION = 2_000;
+const PRISON_CELL = 8;
+
+const INITIAL_PLAYER_MONEY = 2_000_000;
+const START_CELL_MONEY_REWARD = 300_000;
+const PRISON_ESCAPE_COST = 200_000;
+const MAX_PRISON_ATTEMPTS = 3;
+const PRISON_ATTEMPT_RESULT_DURATION = 2_000;
+
+type PlayerColor = "red" | "blue" | "green" | "yellow";
+type ExtraRollReason = "start" | "doubles";
+
+type CellType =
+    | "start"
+    | "city"
+    | "chance"
+    | "special"
+    | "tax"
+    | "world_tour"
+    | "island";
+
+type BoardCell = {
+    name: string;
+    type: CellType;
+    spriteIndex: number;
+};
+
+const BOARD: BoardCell[] = [
+    { name: "Início", type: "start", spriteIndex: 0 },
+    { name: "Granada", type: "city", spriteIndex: 1 },
+    { name: "Sevilha", type: "city", spriteIndex: 1 },
+    { name: "Madri", type: "city", spriteIndex: 1 },
+    { name: "Bali", type: "city", spriteIndex: 2 },
+    { name: "Hong Kong", type: "city", spriteIndex: 3 },
+    { name: "Pequim", type: "city", spriteIndex: 3 },
+    { name: "Kansai", type: "city", spriteIndex: 3 },
+    { name: "Prisão", type: "island", spriteIndex: 4 },
+    { name: "Veneza", type: "city", spriteIndex: 5 },
+    { name: "Milão", type: "city", spriteIndex: 5 },
+    { name: "Roma", type: "city", spriteIndex: 5 },
+    { name: "Sorte", type: "chance", spriteIndex: 6 },
+    { name: "Hamburgo", type: "city", spriteIndex: 7 },
+    { name: "Chipre", type: "city", spriteIndex: 8 },
+    { name: "Berlim", type: "city", spriteIndex: 9 },
+    { name: "Copa do Mundo", type: "special", spriteIndex: 10 },
+    { name: "Londres", type: "city", spriteIndex: 11 },
+    { name: "Rio de Janeiro", type: "city", spriteIndex: 12 },
+    { name: "Sydney", type: "city", spriteIndex: 13 },
+    { name: "Sorte", type: "chance", spriteIndex: 14 },
+    { name: "Chicago", type: "city", spriteIndex: 15 },
+    { name: "Las Vegas", type: "city", spriteIndex: 15 },
+    { name: "Nova Iorque", type: "city", spriteIndex: 15 },
+    { name: "Volta ao Mundo", type: "world_tour", spriteIndex: 16 },
+    { name: "Egito", type: "city", spriteIndex: 17 },
+    { name: "Lion", type: "city", spriteIndex: 18 },
+    { name: "Paris", type: "city", spriteIndex: 18 },
+    { name: "Sorte", type: "chance", spriteIndex: 19 },
+    { name: "São Paulo", type: "city", spriteIndex: 20 },
+    { name: "Impostos", type: "tax", spriteIndex: 21 },
+    { name: "Dubai", type: "city", spriteIndex: 20 }
+];
+
+export class MyRoom extends Room<{ state: MyRoomState }> {
+    maxClients = 4;
+    state = new MyRoomState();
+
+    private board: BoardCell[] = BOARD.map(cell => ({ ...cell }));
+
+    private turnTimeout?: Delayed;
+    private autoStartInterval?: Delayed;
+    private startDelay?: Delayed;
+    private firstPlayerMessageDelay?: Delayed;
+    private extraRollMessageDelay?: Delayed;
+    private prisonMessageDelay?: Delayed;
+    private prisonAttemptDelay?: Delayed;
+
+    private mode: "public" | "private" = "public";
+
+    private playerJoinOrder: string[] = [];
+
+    // --------------------------------------------------
+    // AGUARDAR A CHEGADA VISUAL DOS JOGADORES
+    // --------------------------------------------------
+
+
+    private pendingMovementAnnouncement?: {
+        sessionId: string;
+        type: "prison" | "extra" | "none" | "triple_prison";
+        reason?: ExtraRollReason;
+        arrivedClients: Set<string>;
+    };
+
+
+    private readonly PLAYER_COLORS: PlayerColor[] = [
+        "red",
+        "blue",
+        "green",
+        "yellow"
+    ];
+
+    private readonly CODE_CHARACTERS =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    private readonly CODE_CHANNEL = "$money_town_room_codes";
+
+    // --------------------------------------------------
+    // ALEATORIZAR POSIÇÃO DAS CIDADES ESPECIAIS
+    // --------------------------------------------------
+
+    private randomizeSpecialCities() {
+        const specialGroups = [
+            { name: "Bali", positions: [3, 4, 5] },
+            { name: "Chipre", positions: [13, 14, 15] },
+            { name: "Rio de Janeiro", positions: [17, 18, 19] },
+            { name: "Egito", positions: [25, 26, 27] }
+        ];
+
+        console.log("==================================");
+        console.log("SORTEANDO POSIÇÕES DAS CIDADES ESPECIAIS");
+
+        for (const group of specialGroups) {
+            const currentIndex = this.board.findIndex(
+                cell => cell.name === group.name
+            );
+
+            if (currentIndex === -1) {
+                console.log(
+                    `ERRO: cidade especial ${group.name} não encontrada.`
+                );
+                continue;
+            }
+
+            const randomIndex = Math.floor(
+                Math.random() * group.positions.length
+            );
+
+            const targetPosition = group.positions[randomIndex];
+
+            const previousCell = this.board[targetPosition];
+            const specialCell = this.board[currentIndex];
+
+            this.board[currentIndex] = previousCell;
+            this.board[targetPosition] = specialCell;
+
+            console.log(
+                `${group.name}: posição ${currentIndex} -> ${targetPosition}`
+            );
+
+            console.log(
+                `Casa deslocada: ${previousCell.name} (${targetPosition} -> ${currentIndex})`
+            );
+        }
+
+        console.log("==================================");
+        console.log("TABULEIRO FINAL:");
+
+        this.board.forEach((cell, index) => {
+            console.log(
+                `Posição ${index}: ${cell.name} | Sprite: ${cell.spriteIndex}`
+            );
+        });
+
+        console.log("==================================");
+    }
+
+    // --------------------------------------------------
+    // ENVIAR TABULEIRO ATUALIZADO PARA TODOS OS JOGADORES
+    // --------------------------------------------------
+
+    private broadcastBoard() {
+        const boardData = this.board.map((cell, index) => ({
+            position: index,
+            name: cell.name,
+            type: cell.type,
+            spriteIndex: cell.spriteIndex
+        }));
+
+        this.broadcast("board_data", JSON.stringify(boardData));
+
+        console.log(
+            `Tabuleiro atualizado enviado para todos os jogadores: ${boardData.length} casas.`
+        );
+    }
+
+
+    // --------------------------------------------------
+    // AGENDAR ANÚNCIO APÓS A CHEGADA VISUAL
+    // --------------------------------------------------
+
+    private queueMovementAnnouncement(
+        sessionId: string,
+        type: "prison" | "extra" | "none" | "triple_prison",
+        reason?: ExtraRollReason
+    ) {
+
+        this.pendingMovementAnnouncement = {
+            sessionId,
+            type,
+            reason,
+            arrivedClients: new Set<string>()
+        };
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.state.turnDeadline = 0;
+        this.state.movementAnnouncementPending = true;
+
+        console.log(
+            `Aguardando todos os jogadores confirmarem a chegada de ${sessionId} antes de liberar a próxima etapa.`
+        );
+    }
+
+
+
+
+    // --------------------------------------------------
+    // VERIFICAR SE TODOS OS CLIENTES CHEGARAM
+    // --------------------------------------------------
+
+    private finishMovementAnnouncementIfReady(
+        departedSessionId?: string
+    ) {
+
+        const pending = this.pendingMovementAnnouncement;
+
+        if (!pending) {
+            return;
+        }
+
+        const connectedSessionIds = this.clients
+            .map(client => client.sessionId)
+            .filter(sessionId => sessionId !== departedSessionId);
+
+        const everyoneArrived = connectedSessionIds.every(
+            sessionId => pending.arrivedClients.has(sessionId)
+        );
+
+        if (!everyoneArrived) {
+            return;
+        }
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        if (!this.state.players.has(pending.sessionId)) {
+            return;
+        }
+
+        console.log(
+            `Todos os jogadores confirmaram a chegada de ${pending.sessionId}.`
+        );
+
+        // --------------------------------------------------
+        // PRISÃO NORMAL
+        // --------------------------------------------------
+
+        if (pending.type === "prison") {
+
+            this.showPrisonAnnouncement(pending.sessionId);
+        }
+
+        // --------------------------------------------------
+        // TERCEIRA DUPLA CONSECUTIVA
+        // --------------------------------------------------
+
+        else if (pending.type === "triple_prison") {
+
+            if (this.state.currentTurn === pending.sessionId) {
+
+                // Exibir o popup somente depois da chegada.
+                this.showTripleDoublesAnnouncement(
+                    pending.sessionId
+                );
+            }
+        }
+
+        // --------------------------------------------------
+        // ROLAGEM EXTRA
+        // --------------------------------------------------
+
+        else if (pending.type === "extra" && pending.reason) {
+
+            this.showExtraRollAnnouncement(
+                pending.sessionId,
+                pending.reason
+            );
+        }
+    }
+
+
+
+    // --------------------------------------------------
+    // VERIFICAR SE EXISTE ALGUM POPUP ATIVO
+    // --------------------------------------------------
+
+    private isPopupActive(): boolean {
+        return (
+            this.state.movementAnnouncementPending ||
+            this.state.showFirstPlayerMessage ||
+            this.state.showExtraRollMessage ||
+            this.state.showPrisonMessage
+        );
+    }
+
+    // --------------------------------------------------
+    // INICIAR OU REINICIAR O TEMPO DO TURNO ATUAL
+    // --------------------------------------------------
+
+    private startCurrentTurnTimer(sessionId: string) {
+        this.turnTimeout?.clear();
+
+        this.state.turnDeadline =
+            this.clock.currentTime + TURN_DURATION;
+
+        this.turnTimeout = this.clock.setTimeout(() => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.state.currentTurn !== sessionId) {
+                return;
+            }
+
+            const currentPlayer = this.state.players.get(sessionId);
+
+            if (!currentPlayer) {
+                return;
+            }
+
+            if (!this.state.hasRolled) {
+                console.log(
+                    `Tempo esgotado! Jogador ${sessionId} perdeu a vez.`
+                );
+
+                this.nextTurn();
+            }
+        }, TURN_DURATION);
+    }
+
+    // --------------------------------------------------
+    // LIBERAR JOGADOR DA PRISÃO E PERMITIR UMA ROLAGEM NORMAL
+    // --------------------------------------------------
+
+    private releasePlayerFromPrison(sessionId: string) {
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            return;
+        }
+
+        this.prisonAttemptDelay?.clear();
+        this.prisonAttemptDelay = undefined;
+
+        player.inPrison = false;
+        player.prisonAttempts = 0;
+
+        player.extraRollAvailable = false;
+
+        this.state.dice1 = 0;
+        this.state.dice2 = 0;
+
+        this.state.lastRollBy = "";
+
+        this.state.hasRolled = false;
+        this.state.hasMoved = false;
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.startCurrentTurnTimer(sessionId);
+
+        console.log("==================================");
+        console.log("JOGADOR LIBERADO DA PRISÃO!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log("ROLAGEM NORMAL LIBERADA.");
+        console.log("==================================");
+    }
+
+    // --------------------------------------------------
+    // VERIFICAR SE UMA COR É VÁLIDA
+    // --------------------------------------------------
+
+    private isValidColor(color: string): color is PlayerColor {
+        return this.PLAYER_COLORS.includes(color as PlayerColor);
+    }
+
+    // --------------------------------------------------
+    // ATRIBUIR COR AO JOGADOR
+    // --------------------------------------------------
+
+    private assignPlayerColor(preferredColor: string): PlayerColor {
+        const occupiedColors = new Set<string>();
+
+        this.state.players.forEach((existingPlayer) => {
+            occupiedColors.add(existingPlayer.color);
+        });
+
+        if (
+            this.isValidColor(preferredColor) &&
+            !occupiedColors.has(preferredColor)
+        ) {
+            return preferredColor;
+        }
+
+        for (const color of this.PLAYER_COLORS) {
+            if (!occupiedColors.has(color)) {
+                return color;
+            }
+        }
+
+        return "red";
+    }
+
+    // --------------------------------------------------
+    // ESCOLHER PRIMEIRO JOGADOR ALEATORIAMENTE
+    // --------------------------------------------------
+
+    private chooseRandomFirstPlayer(): string {
+        const sessionIds = [...this.state.players.keys()];
+
+        if (sessionIds.length === 0) {
+            return "";
+        }
+
+        const randomIndex = Math.floor(
+            Math.random() * sessionIds.length
+        );
+
+        return sessionIds[randomIndex];
+    }
+
+    // --------------------------------------------------
+    // ATUALIZAR JOGADOR SORTEADO
+    // --------------------------------------------------
+
+    private updateFirstPlayerAnnouncement(sessionId: string) {
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            this.state.firstPlayerSessionId = "";
+            this.state.firstPlayerName = "";
+            return;
+        }
+
+        this.state.firstPlayerSessionId = sessionId;
+        this.state.firstPlayerName = player.name;
+
+        console.log("==================================");
+        console.log("PRIMEIRO JOGADOR SORTEADO!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log("==================================");
+    }
+
+    // --------------------------------------------------
+    // EXIBIR ANÚNCIO DO PRIMEIRO JOGADOR
+    // --------------------------------------------------
+
+    private showFirstPlayerAnnouncement() {
+        if (this.state.status !== "playing") {
+            return;
+        }
+
+        const firstPlayerSessionId = this.chooseRandomFirstPlayer();
+
+        if (firstPlayerSessionId === "") {
+            return;
+        }
+
+        this.updateFirstPlayerAnnouncement(firstPlayerSessionId);
+
+        this.state.turnDeadline = 0;
+        this.state.showFirstPlayerMessage = true;
+
+        console.log(
+            "Exibindo anúncio do primeiro jogador por 3 segundos."
+        );
+
+        this.firstPlayerMessageDelay?.clear();
+
+        this.firstPlayerMessageDelay = this.clock.setTimeout(() => {
+            this.firstPlayerMessageDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            let selectedSessionId = this.state.firstPlayerSessionId;
+
+            if (!this.state.players.has(selectedSessionId)) {
+                selectedSessionId = this.chooseRandomFirstPlayer();
+
+                if (selectedSessionId === "") {
+                    this.state.showFirstPlayerMessage = false;
+                    this.state.firstPlayerSessionId = "";
+                    this.state.firstPlayerName = "";
+                    return;
+                }
+
+                this.updateFirstPlayerAnnouncement(selectedSessionId);
+            }
+
+            this.state.showFirstPlayerMessage = false;
+
+            console.log(
+                "Anúncio encerrado! Liberando o primeiro turno."
+            );
+
+            this.nextTurn(selectedSessionId);
+        }, FIRST_PLAYER_MESSAGE_DURATION);
+    }
+
+ 
+    // --------------------------------------------------
+    // POPUP: TRÊS DUPLAS CONSECUTIVAS
+    // --------------------------------------------------
+
+    private showTripleDoublesAnnouncement(sessionId: string) {
+
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            return;
+        }
+
+        this.prisonMessageDelay?.clear();
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.state.turnDeadline = 0;
+
+        // A prisão passa a valer após o personagem chegar.
+        player.inPrison = true;
+        player.prisonAttempts = 0;
+        player.extraRollAvailable = false;
+
+        this.state.prisonPlayerSessionId = sessionId;
+        this.state.prisonPlayerName = player.name;
+        this.state.prisonMessageReason = "triple_doubles";
+
+        this.state.showPrisonMessage = true;
+
+        console.log(
+            `Exibindo popup de três duplas para ${player.name} após a chegada.`
+        );
+
+        this.prisonMessageDelay = this.clock.setTimeout(() => {
+
+            this.prisonMessageDelay = undefined;
+
+            this.state.showPrisonMessage = false;
+            this.state.prisonPlayerName = "";
+            this.state.prisonPlayerSessionId = "";
+            this.state.prisonMessageReason = "";
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            // Encerrar o turno somente após o popup.
+            if (
+                this.state.currentTurn === sessionId &&
+                this.state.players.has(sessionId)
+            ) {
+
+                console.log(
+                    `Popup de três duplas encerrado. Passando o turno de ${player.name}.`
+                );
+
+                this.nextTurn();
+            }
+
+        }, TRIPLE_DOUBLES_MESSAGE_DURATION);
+    }
+
+
+ 
+    // --------------------------------------------------
+    // EXIBIR ANÚNCIO DE PRISÃO
+    // --------------------------------------------------
+
+    private showPrisonAnnouncement(sessionId: string) {
+
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            return;
+        }
+
+        this.prisonMessageDelay?.clear();
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.state.turnDeadline = 0;
+
+        // --------------------------------------------------
+        // FINALIZAR RESULTADO E ATIVAR PRISÃO
+        // --------------------------------------------------
+
+        player.inPrison = true;
+
+        this.state.hasRolled = false;
+        this.state.lastRollBy = "";
+
+        // Os valores dos dados não são apagados aqui.
+        // O próximo turno já possui sua própria limpeza.
+
+        this.state.prisonPlayerSessionId = sessionId;
+        this.state.prisonPlayerName = player.name;
+        this.state.showPrisonMessage = true;
+
+        console.log("==================================");
+        console.log("JOGADOR CAIU NA PRISÃO!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log("==================================");
+
+        this.prisonMessageDelay = this.clock.setTimeout(() => {
+
+            this.prisonMessageDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            this.state.showPrisonMessage = false;
+            this.state.prisonPlayerName = "";
+            this.state.prisonPlayerSessionId = "";
+
+            console.log(
+                "Anúncio de prisão encerrado. Encerrando o turno do jogador."
+            );
+
+            if (
+                this.state.currentTurn === sessionId &&
+                this.state.players.has(sessionId)
+            ) {
+                this.nextTurn();
+            }
+
+        }, PRISON_MESSAGE_DURATION);
+    }
+
+
+    // --------------------------------------------------
+    // INICIAR PRAZO DA ROLAGEM EXTRA
+    // --------------------------------------------------
+
+    private startExtraRollTimer(sessionId: string) {
+        if (this.state.status !== "playing") {
+            return;
+        }
+
+        if (this.state.currentTurn !== sessionId) {
+            return;
+        }
+
+        const player = this.state.players.get(sessionId);
+
+        if (!player || !player.extraRollAvailable) {
+            return;
+        }
+
+        this.turnTimeout?.clear();
+
+        this.state.turnDeadline =
+            this.clock.currentTime + TURN_DURATION;
+
+        this.turnTimeout = this.clock.setTimeout(() => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.state.currentTurn !== sessionId) {
+                return;
+            }
+
+            const currentPlayer = this.state.players.get(sessionId);
+
+            if (
+                currentPlayer?.extraRollAvailable &&
+                !this.state.hasRolled
+            ) {
+                console.log(
+                    `Tempo esgotado! Jogador ${sessionId} perdeu a rolagem extra.`
+                );
+
+                this.nextTurn();
+            }
+        }, TURN_DURATION);
+    }
+
+
+ 
+
+    // --------------------------------------------------
+    // EXIBIR ANÚNCIO DA ROLAGEM EXTRA
+    // --------------------------------------------------
+
+    private showExtraRollAnnouncement(
+        sessionId: string,
+        reason: ExtraRollReason
+    ) {
+
+        const player = this.state.players.get(sessionId);
+
+        if (!player) {
+            return;
+        }
+
+        this.extraRollMessageDelay?.clear();
+
+        this.turnTimeout?.clear();
+        this.turnTimeout = undefined;
+
+        this.state.turnDeadline = 0;
+
+        // --------------------------------------------------
+        // FINALIZAR ROLAGEM ANTERIOR APÓS A CHEGADA
+        // --------------------------------------------------
+
+        this.state.hasRolled = false;
+        this.state.lastRollBy = "";
+
+        // Preservar dice1 e dice2 para o popup de duplas.
+        // Somente uma nova rolagem substituirá esses valores.
+
+        this.state.extraRollPlayerSessionId = sessionId;
+        this.state.extraRollPlayerName = player.name;
+        this.state.extraRollReason = reason;
+        this.state.showExtraRollMessage = true;
+
+        console.log("==================================");
+        console.log("ROLAGEM EXTRA CONCEDIDA!");
+        console.log("JOGADOR:", player.name);
+        console.log("SESSION ID:", sessionId);
+        console.log(
+            "MOTIVO:",
+            reason === "start" ? "CASA INICIAL" : "DUPLAS"
+        );
+        console.log("==================================");
+
+        this.extraRollMessageDelay = this.clock.setTimeout(() => {
+
+            this.extraRollMessageDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            this.state.showExtraRollMessage = false;
+            this.state.extraRollPlayerName = "";
+            this.state.extraRollPlayerSessionId = "";
+            this.state.extraRollReason = "";
+
+            console.log(
+                "Popup da rolagem extra encerrado. Liberando a partida."
+            );
+
+            this.startExtraRollTimer(sessionId);
+
+        }, EXTRA_ROLL_MESSAGE_DURATION);
+    }
+
+
+
+
+    // --------------------------------------------------
+    // GERAR CÓDIGO DE 6 CARACTERES
+    // --------------------------------------------------
+
+    private generateCode(): string {
+        let code = "";
+
+        for (let i = 0; i < 6; i++) {
+            const index = Math.floor(
+                Math.random() * this.CODE_CHARACTERS.length
+            );
+
+            code += this.CODE_CHARACTERS[index];
+        }
+
+        return code;
+    }
+
+    // --------------------------------------------------
+    // GARANTIR CÓDIGO ÚNICO
+    // --------------------------------------------------
+
+    private async generateRoomCode(): Promise<string> {
+        const existingCodes = await this.presence.smembers(
+            this.CODE_CHANNEL
+        );
+
+        let code = "";
+
+        do {
+            code = this.generateCode();
+        } while (existingCodes.includes(code));
+
+        await this.presence.sadd(this.CODE_CHANNEL, code);
+
+        return code;
+    }
+
+    // --------------------------------------------------
+    // CANCELAR CONTAGEM AUTOMÁTICA
+    // --------------------------------------------------
+
+    private clearAutoStartCountdown() {
+        this.autoStartInterval?.clear();
+        this.autoStartInterval = undefined;
+
+        this.state.autoStartCountdown = 0;
+    }
+
+    // --------------------------------------------------
+    // REINICIAR CONTAGEM AUTOMÁTICA
+    // --------------------------------------------------
+
+    private resetAutoStartCountdown() {
+        if (this.mode !== "public") {
+            this.clearAutoStartCountdown();
+            return;
+        }
+
+        if (this.state.status !== "waiting") {
+            this.clearAutoStartCountdown();
+            return;
+        }
+
+        this.clearAutoStartCountdown();
+
+        if (this.state.players.size < 2) {
+            return;
+        }
+
+        this.state.autoStartCountdown = AUTO_START_DURATION;
+
+        console.log(
+            `Contagem automática iniciada: ${this.roomId} (${AUTO_START_DURATION}s)`
+        );
+
+        this.autoStartInterval = this.clock.setInterval(() => {
+            if (this.state.status !== "waiting") {
+                this.clearAutoStartCountdown();
+                return;
+            }
+
+            if (this.state.players.size < 2) {
+                this.clearAutoStartCountdown();
+                return;
+            }
+
+            this.state.autoStartCountdown--;
+
+            console.log(
+                `Sala ${this.roomId}: ${this.state.autoStartCountdown}s`
+            );
+
+            if (this.state.autoStartCountdown <= 0) {
+                this.clearAutoStartCountdown();
+                this.startGame();
+            }
+        }, 1000);
+    }
+
+    // --------------------------------------------------
+    // INICIAR PARTIDA
+    // --------------------------------------------------
+
+    private startGame() {
+        if (this.state.status !== "waiting") {
+            return;
+        }
+
+        if (this.state.players.size < 2) {
+            return;
+        }
+
+        this.clearAutoStartCountdown();
+
+        this.randomizeSpecialCities();
+        this.broadcastBoard();
+
+        this.state.status = "playing";
+
+        this.state.currentTurn = "";
+        this.state.turnDeadline = 0;
+        this.state.turnCount = 0;
+
+        this.state.hasRolled = false;
+        this.state.hasMoved = false;
+
+        this.state.dice1 = 0;
+        this.state.dice2 = 0;
+        this.state.lastRollBy = "";
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        this.state.showFirstPlayerMessage = false;
+        this.state.firstPlayerSessionId = "";
+        this.state.firstPlayerName = "";
+
+        this.state.showExtraRollMessage = false;
+        this.state.extraRollPlayerName = "";
+        this.state.extraRollPlayerSessionId = "";
+        this.state.extraRollReason = "";
+
+        this.state.showPrisonMessage = false;
+        this.state.prisonPlayerName = "";
+        this.state.prisonPlayerSessionId = "";
+
+        this.playersResetForNewGame();
+
+        void this.setMetadata({
+            mode: this.mode,
+            status: this.state.status
+        });
+
+        this.lock();
+
+        console.log("Partida iniciada:", this.roomId);
+        console.log("Aguardando 3 segundos para iniciar o anúncio...");
+
+        this.startDelay?.clear();
+
+        this.startDelay = this.clock.setTimeout(() => {
+            this.startDelay = undefined;
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            console.log("Animação concluída! Sorteando primeiro jogador.");
+
+            this.showFirstPlayerAnnouncement();
+        }, GAME_START_DELAY);
+    }
+
+    // --------------------------------------------------
+    // REINICIAR ESTADOS DOS JOGADORES
+    // --------------------------------------------------
+
+    private playersResetForNewGame() {
+
+        this.state.players.forEach((player) => {
+
+            player.extraRollAvailable = false;
+
+            player.consecutiveDoubles = 0;
+            player.prisonReturnBackward = false;
+
+            player.inPrison = false;
+            player.prisonAttempts = 0;
+
+            player.debtsAvailable = 1;
+        });
+    }
+
+
+    messages = {
+        select_color: (client: Client, data: any) => {
+            if (this.state.status !== "waiting") {
+                client.send(
+                    "color_error",
+                    "Não é possível trocar de cor depois que a partida começou."
+                );
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player) {
+                return;
+            }
+
+            const requestedColor = String(data?.color ?? "");
+
+            if (!this.isValidColor(requestedColor)) {
+                client.send("color_error", "Cor inválida.");
+                return;
+            }
+
+            const occupied = [...this.state.players.keys()].some(
+                sessionId => {
+                    if (sessionId === client.sessionId) {
+                        return false;
+                    }
+
+                    const otherPlayer = this.state.players.get(sessionId);
+
+                    return otherPlayer?.color === requestedColor;
+                }
+            );
+
+            if (occupied) {
+                client.send(
+                    "color_error",
+                    "Essa cor já está sendo utilizada por outro jogador."
+                );
+                return;
+            }
+
+            player.color = requestedColor;
+
+            console.log(
+                `${player.name} escolheu a cor: ${requestedColor}`
+            );
+        },
+
+        start: (client: Client) => {
+            if (this.state.status !== "waiting") {
+                client.send("start_error", "A partida já começou.");
+                return;
+            }
+
+            if (this.mode !== "private") {
+                client.send(
+                    "start_error",
+                    "Partidas públicas começam automaticamente."
+                );
+                return;
+            }
+
+            if (client.sessionId !== this.state.hostSessionId) {
+                client.send(
+                    "start_error",
+                    "Somente o anfitrião pode iniciar."
+                );
+                return;
+            }
+
+            if (this.state.players.size < 2) {
+                client.send(
+                    "start_error",
+                    "São necessários pelo menos 2 jogadores."
+                );
+                return;
+            }
+
+            this.startGame();
+        },
+
+        // --------------------------------------------------
+        // ENVIAR TABULEIRO
+        // --------------------------------------------------
+
+        get_board: (client: Client) => {
+            const boardData = this.board.map((cell, index) => ({
+                position: index,
+                name: cell.name,
+                type: cell.type,
+                spriteIndex: cell.spriteIndex
+            }));
+
+            client.send("board_data", JSON.stringify(boardData));
+
+            console.log(
+                `Tabuleiro enviado para ${client.sessionId}: ${boardData.length} casas.`
+            );
+        },
+
+        // --------------------------------------------------
+        // CONFIRMAR CHEGADA DA ANIMAÇÃO DE MOVIMENTO
+        // --------------------------------------------------
+
+        movement_arrived: (client: Client) => {
+            const pending = this.pendingMovementAnnouncement;
+
+            if (!pending) {
+                return;
+            }
+
+            if (!this.state.players.has(client.sessionId)) {
+                return;
+            }
+
+            pending.arrivedClients.add(client.sessionId);
+
+            console.log(
+                `Chegada confirmada: ${client.sessionId} (${pending.arrivedClients.size}/${this.clients.length})`
+            );
+
+            this.finishMovementAnnouncementIfReady();
+        },
+
+
+
+        // --------------------------------------------------
+        // ROLAR DADOS NORMALMENTE
+        // --------------------------------------------------
+
+        roll_dice: (client: Client) => {
+
+            if (this.state.status !== "playing") {
+
+                client.send(
+                    "action_error",
+                    "A partida ainda não começou."
+                );
+
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+
+                client.send(
+                    "action_error",
+                    "Não é seu turno."
+                );
+
+                return;
+            }
+
+            const player = this.state.players.get(
+                client.sessionId
+            );
+
+            if (!player) {
+                return;
+            }
+
+            if (player.inPrison) {
+
+                client.send(
+                    "action_error",
+                    "Você precisa resolver sua situação na prisão primeiro."
+                );
+
+                return;
+            }
+
+            if (this.state.hasRolled) {
+
+                client.send(
+                    "action_error",
+                    "Você já rolou os dados nesta rodada."
+                );
+
+                return;
+            }
+
+            if (
+                this.state.hasMoved &&
+                !player.extraRollAvailable
+            ) {
+
+                client.send(
+                    "action_error",
+                    "Você já movimentou nesta rodada."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // ROLAR DADOS
+            // --------------------------------------------------
+
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+
+            const rolledDoubles = dice1 === dice2;
+
+            this.state.dice1 = dice1;
+            this.state.dice2 = dice2;
+
+            this.state.lastRollBy = client.sessionId;
+            this.state.hasRolled = true;
+
+            player.extraRollAvailable = false;
+            player.prisonReturnBackward = false;
+
+            this.state.hasMoved = false;
+
+            // --------------------------------------------------
+            // CONTAR DUPLAS CONSECUTIVAS
+            // --------------------------------------------------
+
+            if (rolledDoubles) {
+
+                player.consecutiveDoubles++;
+
+            } else {
+
+                player.consecutiveDoubles = 0;
+            }
+
+            console.log(
+                `${player.name}: ${dice1} + ${dice2}`
+            );
+
+            console.log(
+                `Duplas consecutivas: ${player.consecutiveDoubles}`
+            );
+
+            // --------------------------------------------------
+            // TERCEIRA DUPLA: PRISÃO
+            // --------------------------------------------------
+
+            if (player.consecutiveDoubles >= 3) {
+
+                const previousPosition = player.position;
+
+                player.consecutiveDoubles = 0;
+
+                player.prisonReturnBackward =
+                    previousPosition > PRISON_CELL;
+
+                player.position = PRISON_CELL;
+
+                player.lastCellType =
+                    this.board[PRISON_CELL].type;
+
+                player.lastCellName =
+                    this.board[PRISON_CELL].name;
+
+                // A prisão será ativada quando chegar.
+                // Manter inPrison como false durante a
+                // animação para exibir os dados a todos.
+                player.inPrison = false;
+
+                player.prisonAttempts = 0;
+                player.extraRollAvailable = false;
+
+                this.state.hasMoved = true;
+
+                // IMPORTANTE:
+                // Não apagar hasRolled nem lastRollBy.
+                // O resultado deve continuar visível
+                // durante toda a caminhada.
+
+                console.log(
+                    `${player.name} fez três duplas e foi enviado à prisão.`
+                );
+
+                console.log(
+                    `Movimento: ${previousPosition} -> ${PRISON_CELL}`
+                );
+
+                this.queueMovementAnnouncement(
+                    client.sessionId,
+                    "triple_prison"
+                );
+
+                // Não exibir o popup aqui.
+                // O anúncio será iniciado após todos
+                // confirmarem a chegada à casa 8.
+
+                return;
+            }
+        },
+
+        // --------------------------------------------------
+        // TENTAR SAIR DA PRISÃO COM DUPLAS
+        // --------------------------------------------------
+
+        prison_try_doubles: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive() || this.prisonAttemptDelay) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                client.send("action_error", "Não é seu turno.");
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player || !player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você não está na prisão."
+                );
+                return;
+            }
+
+            if (this.state.hasRolled || this.state.hasMoved) {
+                client.send(
+                    "action_error",
+                    "Não é possível tentar sair da prisão agora."
+                );
+                return;
+            }
+
+            const dice1 = Math.floor(Math.random() * 6) + 1;
+            const dice2 = Math.floor(Math.random() * 6) + 1;
+
+            const rolledDoubles = dice1 === dice2;
+
+            player.prisonAttempts++;
+
+            // Os dados são compartilhados com o cliente para exibição.
+            // O jogador continua preso durante esse período.
+            this.state.dice1 = dice1;
+            this.state.dice2 = dice2;
+            this.state.lastRollBy = client.sessionId;
+            this.state.hasRolled = true;
+            this.state.hasMoved = false;
+
+            // Pausar o limite do turno enquanto o resultado aparece.
+            this.turnTimeout?.clear();
+            this.turnTimeout = undefined;
+            this.state.turnDeadline = 0;
+
+            console.log("==================================");
+            console.log("TENTATIVA DE SAIR DA PRISÃO");
+            console.log("JOGADOR:", player.name);
+            console.log(`DADOS: ${dice1} + ${dice2}`);
+            console.log("DUPLAS:", rolledDoubles);
+            console.log(
+                `TENTATIVA: ${player.prisonAttempts}/${MAX_PRISON_ATTEMPTS}`
+            );
+            console.log("==================================");
+
+            // Aguardar a HUD exibir os dados e o resultado.
+            this.prisonAttemptDelay?.clear();
+
+            this.prisonAttemptDelay = this.clock.setTimeout(() => {
+                this.prisonAttemptDelay = undefined;
+
+                if (this.state.status !== "playing") {
+                    return;
+                }
+
+                if (this.state.currentTurn !== client.sessionId) {
+                    return;
+                }
+
+                const currentPlayer = this.state.players.get(client.sessionId);
+
+                if (!currentPlayer || !currentPlayer.inPrison) {
+                    return;
+                }
+
+                // Conseguiu duplas: liberar e permitir uma rolagem normal.
+                if (rolledDoubles) {
+                    console.log(
+                        `${currentPlayer.name} conseguiu duplas e saiu da prisão.`
+                    );
+
+                    this.releasePlayerFromPrison(client.sessionId);
+                    return;
+                }
+
+                // Terceira tentativa: libertar automaticamente.
+                if (currentPlayer.prisonAttempts >= MAX_PRISON_ATTEMPTS) {
+                    console.log(
+                        `${currentPlayer.name} atingiu o limite de tentativas e foi liberado automaticamente.`
+                    );
+
+                    this.releasePlayerFromPrison(client.sessionId);
+                    return;
+                }
+
+                // Falhou: informar e encerrar o turno.
+                client.send(
+                    "prison_attempt_failed",
+                    {
+                        attempts: currentPlayer.prisonAttempts,
+                        maxAttempts: MAX_PRISON_ATTEMPTS
+                    }
+                );
+
+                console.log(
+                    `${currentPlayer.name} não conseguiu duplas. A próxima tentativa será no próximo turno.`
+                );
+
+                this.nextTurn();
+            }, PRISON_ATTEMPT_RESULT_DURATION);
+        },
+
+        // --------------------------------------------------
+        // PAGAR PARA SAIR DA PRISÃO
+        // --------------------------------------------------
+
+        prison_pay: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.prisonAttemptDelay) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                client.send("action_error", "Não é seu turno.");
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player || !player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você não está na prisão."
+                );
+                return;
+            }
+
+            if (player.money < PRISON_ESCAPE_COST) {
+                client.send(
+                    "action_error",
+                    "Você não possui dinheiro suficiente para pagar a saída da prisão."
+                );
+                return;
+            }
+
+            player.money -= PRISON_ESCAPE_COST;
+
+            console.log("==================================");
+            console.log("JOGADOR PAGOU PARA SAIR DA PRISÃO");
+            console.log("JOGADOR:", player.name);
+            console.log("VALOR PAGO:", PRISON_ESCAPE_COST);
+            console.log("DINHEIRO RESTANTE:", player.money);
+            console.log("==================================");
+
+            this.releasePlayerFromPrison(client.sessionId);
+        },
+
+        // --------------------------------------------------
+        // USAR DÍVIDA PARA SAIR DA PRISÃO
+        // --------------------------------------------------
+
+        prison_use_debt: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.prisonAttemptDelay) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                client.send("action_error", "Não é seu turno.");
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player || !player.inPrison) {
+                client.send(
+                    "action_error",
+                    "Você não está na prisão."
+                );
+                return;
+            }
+
+            if (player.debtsAvailable <= 0) {
+                client.send(
+                    "action_error",
+                    "Você não possui dívidas disponíveis."
+                );
+                return;
+            }
+
+            player.debtsAvailable--;
+
+            console.log("==================================");
+            console.log("JOGADOR USOU UMA DÍVIDA PARA SAIR DA PRISÃO");
+            console.log("JOGADOR:", player.name);
+            console.log(
+                "DÍVIDAS RESTANTES:",
+                player.debtsAvailable
+            );
+            console.log("==================================");
+
+            this.releasePlayerFromPrison(client.sessionId);
+        },
+
+
+        // --------------------------------------------------
+        // MOVIMENTAR JOGADOR
+        // --------------------------------------------------
+
+        move: (client: Client) => {
+
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                return;
+            }
+
+            const player = this.state.players.get(
+                client.sessionId
+            );
+
+            if (!player) {
+                return;
+            }
+
+            if (player.inPrison) {
+
+                client.send(
+                    "action_error",
+                    "Você precisa sair da prisão antes de movimentar."
+                );
+
+                return;
+            }
+
+            if (
+                !this.state.hasRolled ||
+                this.state.lastRollBy !== client.sessionId
+            ) {
+
+                client.send(
+                    "action_error",
+                    "Você precisa rolar os dados primeiro."
+                );
+
+                return;
+            }
+
+            if (this.state.hasMoved) {
+
+                client.send(
+                    "action_error",
+                    "Você já movimentou nesta rodada."
+                );
+
+                return;
+            }
+
+            const dice1 = this.state.dice1;
+            const dice2 = this.state.dice2;
+
+            const rolledDoubles = dice1 === dice2;
+
+            const steps = dice1 + dice2;
+
+            const startingPosition = player.position;
+            const newPosition = startingPosition + steps;
+
+            const completedLaps = Math.floor(
+                newPosition / BOARD_SIZE
+            );
+
+            const landedPosition = newPosition % BOARD_SIZE;
+
+            player.position = landedPosition;
+            player.laps += completedLaps;
+
+            const landedCell = this.board[landedPosition];
+
+            player.lastCellType = landedCell.type;
+            player.lastCellName = landedCell.name;
+
+            this.state.hasMoved = true;
+
+            console.log(
+                `${player.name} avançou ${steps} casas. Posição: ${player.position}`
+            );
+
+            console.log(
+                `${player.name} caiu na casa ${player.position}: ${landedCell.name} (${landedCell.type})`
+            );
+
+            console.log(
+                `Dados: ${dice1} + ${dice2} | Duplas: ${rolledDoubles}`
+            );
+
+            // --------------------------------------------------
+            // RECOMPENSA POR COMPLETAR VOLTAS
+            // --------------------------------------------------
+
+            if (completedLaps > 0) {
+
+                console.log(
+                    `${player.name} completou ${completedLaps} volta(s). Total: ${player.laps}`
+                );
+
+                const totalMoneyReward =
+                    START_CELL_MONEY_REWARD * completedLaps;
+
+                player.money += totalMoneyReward;
+
+                console.log(
+                    `${player.name} recebeu $${totalMoneyReward.toLocaleString("pt-BR")} por completar ${completedLaps} volta(s).`
+                );
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR SE CAIU NA PRISÃO
+            // --------------------------------------------------
+
+            const landedInPrison =
+                landedCell.name === "Prisão" &&
+                landedCell.type === "island";
+
+            if (landedInPrison) {
+
+                // A prisão será ativada após a chegada.
+                // Enquanto caminha, manter a exibição
+                // do resultado dos dados.
+
+                player.prisonAttempts = 0;
+                player.extraRollAvailable = false;
+
+                this.state.hasMoved = true;
+
+                // Não zerar hasRolled nem lastRollBy aqui.
+
+                console.log(
+                    `${player.name} foi enviado para a prisão. O turno será encerrado após o anúncio.`
+                );
+
+                this.queueMovementAnnouncement(
+                    client.sessionId,
+                    "prison"
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // CASA INICIAL
+            // --------------------------------------------------
+
+            const landedExactlyOnStart =
+                landedPosition === 0 &&
+                landedCell.type === "start" &&
+                landedCell.name === "Início";
+
+            const receivesStartExtraRoll =
+                landedExactlyOnStart &&
+                completedLaps > 0 &&
+                player.laps >= 1;
+
+            let extraRollReason: ExtraRollReason | undefined;
+
+            if (receivesStartExtraRoll) {
+
+                extraRollReason = "start";
+
+            } else if (rolledDoubles) {
+
+                extraRollReason = "doubles";
+            }
+
+            const canReceiveExtraRoll =
+                extraRollReason !== undefined;
+
+            console.log(
+                `[VERIFICAÇÃO ROLAGEM EXTRA] ${player.name} | ` +
+                `posição inicial: ${startingPosition} | ` +
+                `dados: ${dice1} + ${dice2} | ` +
+                `duplas: ${rolledDoubles} | ` +
+                `posição final: ${landedPosition} | ` +
+                `voltas: ${player.laps} | ` +
+                `terminou no início: ${receivesStartExtraRoll} | ` +
+                `motivo: ${extraRollReason ?? "nenhum"} | ` +
+                `recebe extra: ${canReceiveExtraRoll}`
+            );
+
+            // --------------------------------------------------
+            // ROLAGEM EXTRA
+            // --------------------------------------------------
+
+            if (canReceiveExtraRoll && extraRollReason) {
+
+                player.extraRollAvailable = true;
+
+                this.state.hasMoved = true;
+
+                // Preservar hasRolled e lastRollBy
+                // até a chegada do personagem.
+                //
+                // Isso mantém o resultado visível
+                // para todos os clientes.
+
+                console.log(
+                    `${player.name} recebeu uma rolagem extra pelo motivo: ${extraRollReason}.`
+                );
+
+                this.queueMovementAnnouncement(
+                    client.sessionId,
+                    "extra",
+                    extraRollReason
+                );
+
+            } else {
+
+                // --------------------------------------------------
+                // MOVIMENTO NORMAL
+                // --------------------------------------------------
+
+                // Mesmo sem popup, aguardar a animação
+                // antes de liberar as ações da HUD.
+
+                this.queueMovementAnnouncement(
+                    client.sessionId,
+                    "none"
+                );
+            }
+        },
+
+
+        // --------------------------------------------------
+        // ENCERRAR TURNO
+        // --------------------------------------------------
+
+        end_turn: (client: Client) => {
+
+            const player = this.state.players.get(client.sessionId);
+
+            console.log("==================================");
+            console.log("[END_TURN] SOLICITACAO RECEBIDA");
+            console.log("[END_TURN] Cliente:", client.sessionId);
+            console.log("[END_TURN] Jogador:", player?.name ?? "Nao encontrado");
+            console.log("[END_TURN] Status:", this.state.status);
+            console.log("[END_TURN] Turno atual:", this.state.currentTurn);
+            console.log("[END_TURN] HasRolled:", this.state.hasRolled);
+            console.log("[END_TURN] HasMoved:", this.state.hasMoved);
+            console.log("[END_TURN] Primeiro jogador popup:", this.state.showFirstPlayerMessage);
+            console.log("[END_TURN] Rolagem extra popup:", this.state.showExtraRollMessage);
+            console.log("[END_TURN] Prisao popup:", this.state.showPrisonMessage);
+            console.log("[END_TURN] Preso:", player?.inPrison);
+            console.log("[END_TURN] Rolagem extra:", player?.extraRollAvailable);
+            console.log("[END_TURN] Jogadores na sala:", this.state.players.size);
+
+            // --------------------------------------------------
+            // VERIFICAR PARTIDA
+            // --------------------------------------------------
+
+            if (this.state.status !== "playing") {
+
+                console.log("[END_TURN] BLOQUEADO: partida nao esta em andamento.");
+
+                client.send(
+                    "action_error",
+                    "A partida nao esta em andamento."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR POPUPS
+            // --------------------------------------------------
+
+            if (this.isPopupActive()) {
+
+                console.log("[END_TURN] BLOQUEADO: popup ativo no servidor.");
+
+                client.send(
+                    "action_error",
+                    "Aguarde o encerramento do popup."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR JOGADOR
+            // --------------------------------------------------
+
+            if (!player) {
+
+                console.log("[END_TURN] BLOQUEADO: jogador nao encontrado.");
+
+                client.send(
+                    "action_error",
+                    "Jogador nao encontrado."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR TURNO
+            // --------------------------------------------------
+
+            if (this.state.currentTurn !== client.sessionId) {
+
+                console.log("[END_TURN] BLOQUEADO: nao e o turno deste cliente.");
+
+                client.send(
+                    "action_error",
+                    "Nao e seu turno."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR MOVIMENTO
+            // --------------------------------------------------
+
+            if (!this.state.hasMoved) {
+
+                console.log("[END_TURN] BLOQUEADO: movimento nao concluido.");
+
+                client.send(
+                    "action_error",
+                    "Voce precisa movimentar antes de encerrar o turno."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR PRISAO
+            // --------------------------------------------------
+
+            if (player.inPrison) {
+
+                console.log("[END_TURN] BLOQUEADO: jogador esta preso.");
+
+                client.send(
+                    "action_error",
+                    "Voce ainda esta na prisao."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR ROLAGEM EXTRA
+            // --------------------------------------------------
+
+            if (player.extraRollAvailable) {
+
+                console.log("[END_TURN] BLOQUEADO: rolagem extra pendente.");
+
+                client.send(
+                    "action_error",
+                    "Utilize sua rolagem extra antes de encerrar o turno."
+                );
+
+                return;
+            }
+
+            // --------------------------------------------------
+            // ENCERRAR TURNO
+            // --------------------------------------------------
+
+            console.log("[END_TURN] AUTORIZADO!");
+            console.log("[END_TURN] Encerrando turno de:", player.name);
+
+            const previousTurn = this.state.currentTurn;
+
+            this.nextTurn();
+
+            console.log("[END_TURN] Turno anterior:", previousTurn);
+            console.log("[END_TURN] Novo turno:", this.state.currentTurn);
+            console.log("==================================");
+        },
+
+
+        play: (client: Client) => {
+            if (this.state.status !== "playing") {
+                return;
+            }
+
+            if (this.isPopupActive()) {
+                return;
+            }
+
+            if (this.state.currentTurn !== client.sessionId) {
+                return;
+            }
+
+            const player = this.state.players.get(client.sessionId);
+
+            if (!player) {
+                return;
+            }
+
+            if (player.inPrison) {
+                return;
+            }
+
+            player.score++;
+            this.nextTurn();
+        },
+    };
+
+    // --------------------------------------------------
+    // CRIAÇÃO DA SALA
+    // --------------------------------------------------
+
+    async onCreate(options: any) {
+        this.roomId = await this.generateRoomCode();
+
+        this.mode = options.mode === "private" ? "private" : "public";
+
+        this.state.status = "waiting";
+        this.state.autoStartCountdown = 0;
+
+        this.state.movementAnnouncementPending = false;
+        this.pendingMovementAnnouncement = undefined;
+
+        this.state.showFirstPlayerMessage = false;
+        this.state.firstPlayerSessionId = "";
+        this.state.firstPlayerName = "";
+
+        this.state.showExtraRollMessage = false;
+        this.state.extraRollPlayerName = "";
+        this.state.extraRollPlayerSessionId = "";
+        this.state.extraRollReason = "";
+
+        this.state.showPrisonMessage = false;
+        this.state.prisonPlayerName = "";
+        this.state.prisonPlayerSessionId = "";
+
+        await this.setMatchmaking({
+            metadata: {
+                mode: this.mode,
+                status: this.state.status
+            },
+            private: this.mode === "private"
+        });
+
+        console.log("==================================");
+        console.log("SALA CRIADA:", this.roomId);
+        console.log("MODO:", this.mode);
+        console.log("PRIVADA:", this.mode === "private");
+        console.log(
+            "LISTAGEM:",
+            this.mode === "public" ? "PUBLICA" : "OCULTA"
+        );
+        console.log("==================================");
+
+        console.log("Tabuleiro carregado:", this.board.length, "casas.");
+
+        if (this.board.length !== BOARD_SIZE) {
+            throw new Error(
+                `Tabuleiro inválido: esperado ${BOARD_SIZE}, encontrado ${this.board.length}.`
+            );
+        }
+    }
+
+    // --------------------------------------------------
+    // AUTENTICAÇÃO
+    // --------------------------------------------------
+
+    
+    // --------------------------------------------------
+    // AUTENTICAÇÃO
+    // --------------------------------------------------
+
+    onAuth(client: Client, options: any) {
+
+        if (this.state.status !== "waiting") {
+            throw new ServerError(409, "Esta partida já começou.");
+        }
+
+        if (options?.mode !== this.mode) {
+            throw new ServerError(
+                403,
+                "Esta sala não pertence a essa modalidade de partida."
+            );
+        }
+
+        // --------------------------------------------------
+        // VALIDAR NOME STEAM
+        // --------------------------------------------------
+
+        if (
+            typeof options?.playerName !== "string"
+        ) {
+            throw new ServerError(400, "Nome Steam inválido.");
+        }
+
+        const playerName = String(options.playerName).trim();
+
+        if (playerName.length === 0 || playerName.length > 32) {
+            throw new ServerError(
+                400,
+                "O nome Steam deve possuir entre 1 e 32 caracteres."
+            );
+        }
+
+        // --------------------------------------------------
+        // VALIDAR STEAM ID
+        // --------------------------------------------------
+
+        const steamId = String(options?.steamId ?? "").trim();
+
+        if (!/^\d{17}$/.test(steamId)) {
+            throw new ServerError(
+                400,
+                "Steam ID inválido ou não recebido."
+            );
+        }
+
+        // --------------------------------------------------
+        // VALIDAR PERSONAGEM
+        // --------------------------------------------------
+
+        const selectedCharacter = Number(
+            options?.selectedCharacter ?? 0
+        );
+
+        const validCharacter =
+            Number.isInteger(selectedCharacter) &&
+            selectedCharacter >= 0 &&
+            selectedCharacter <= 3;
+
+        if (!validCharacter) {
+            throw new ServerError(400, "Personagem inválido.");
+        }
+
+        // --------------------------------------------------
+        // VALIDAR COR
+        // --------------------------------------------------
+
+        const preferredColor =
+            typeof options?.selectedColor === "string" &&
+            this.isValidColor(options.selectedColor)
+                ? options.selectedColor
+                : "red";
+
+        return {
+            playerName,
+            steamId,
+            preferredColor,
+            selectedCharacter
+        };
+    }
+
+
+    // --------------------------------------------------
+    // ENTRADA DO JOGADOR
+    // --------------------------------------------------
+
+        
+    // --------------------------------------------------
+    // ENTRADA DO JOGADOR
+    // --------------------------------------------------
+
+    onJoin(client: Client, options: any, auth: any) {
+
+        const player = new Player();
+
+        // Identidade Steam.
+        player.name = auth.playerName;
+        player.steamId = auth.steamId;
+
+        player.money = INITIAL_PLAYER_MONEY;
+        player.character = auth.selectedCharacter ?? 0;
+
+        player.position = 0;
+        player.laps = 0;
+        player.extraRollAvailable = false;
+
+        player.inPrison = false;
+        player.prisonAttempts = 0;
+        player.debtsAvailable = 1;
+
+        player.lastCellType = this.board[0].type;
+        player.lastCellName = this.board[0].name;
+
+        player.color = this.assignPlayerColor(
+            auth.preferredColor ?? "red"
+        );
+
+        this.state.players.set(client.sessionId, player);
+
+        this.playerJoinOrder.push(client.sessionId);
+
+        if (this.state.hostSessionId === "") {
+            this.state.hostSessionId = client.sessionId;
+        }
+
+        console.log("==================================");
+        console.log(`${player.name} entrou na sala ${this.roomId}!`);
+        console.log("STEAM ID:", player.steamId);
+        console.log("SESSION ID:", client.sessionId);
+        console.log("Cor atribuída:", player.color);
+        console.log("Personagem escolhido:", player.character);
+        console.log("Dinheiro inicial:", player.money);
+        console.log("Dívidas disponíveis:", player.debtsAvailable);
+
+        console.log(
+            "Ordem de entrada:",
+            this.playerJoinOrder.join(" -> ")
+        );
+
+        console.log("==================================");
+
+        this.resetAutoStartCountdown();
+    }
+
+    // --------------------------------------------------
+    // SAÍDA DO JOGADOR
+    // --------------------------------------------------
+
+    onLeave(client: Client, code: CloseCode) {
+        console.log(client.sessionId, "saiu da sala!", code);
+
+        const wasTheirTurn =
+            this.state.currentTurn === client.sessionId;
+
+        const wasHost =
+            this.state.hostSessionId === client.sessionId;
+
+        const wasSelectedFirstPlayer =
+            this.state.firstPlayerSessionId === client.sessionId;
+
+        const wasExtraRollPlayer =
+            this.state.extraRollPlayerSessionId === client.sessionId;
+
+        const wasPrisonMessagePlayer =
+            this.state.prisonPlayerSessionId === client.sessionId;
+
+        this.state.players.delete(client.sessionId);
+
+        this.playerJoinOrder = this.playerJoinOrder.filter(
+            sessionId => sessionId !== client.sessionId
+        );
+
+        // Atualizar a espera de chegada caso alguém saia da sala.
+        if (this.pendingMovementAnnouncement) {
+            if (
+                this.pendingMovementAnnouncement.sessionId ===
+                client.sessionId
+            ) {
+                this.pendingMovementAnnouncement = undefined;
+                this.state.movementAnnouncementPending = false;
+            }
+            else {
+                this.pendingMovementAnnouncement.arrivedClients.delete(
+                    client.sessionId
+                );
+
+                this.finishMovementAnnouncementIfReady(
+                    client.sessionId
+                );
+            }
+        }
+
+        if (
+            this.state.showFirstPlayerMessage &&
+            wasSelectedFirstPlayer
+        ) {
+            const newFirstPlayer = this.chooseRandomFirstPlayer();
+
+            if (newFirstPlayer !== "") {
+                this.updateFirstPlayerAnnouncement(newFirstPlayer);
+            } else {
+                this.state.firstPlayerSessionId = "";
+                this.state.firstPlayerName = "";
+            }
+        }
+
+        if (
+            this.state.showExtraRollMessage &&
+            wasExtraRollPlayer
+        ) {
+            this.extraRollMessageDelay?.clear();
+            this.extraRollMessageDelay = undefined;
+
+            this.state.showExtraRollMessage = false;
+            this.state.extraRollPlayerName = "";
+            this.state.extraRollPlayerSessionId = "";
+            this.state.extraRollReason = "";
+
+            if (this.state.status === "playing" && wasTheirTurn) {
+                this.nextTurn();
+            }
+        }
+
+        if (
+            this.state.showPrisonMessage &&
+            wasPrisonMessagePlayer
+        ) {
+            this.prisonMessageDelay?.clear();
+            this.prisonMessageDelay = undefined;
+
+            this.state.showPrisonMessage = false;
+            this.state.prisonPlayerName = "";
+            this.state.prisonPlayerSessionId = "";
+        }
+
+        if (
+            this.state.status === "waiting" &&
+            wasHost
+        ) {
+            const nextHost = this.playerJoinOrder.find(
+                sessionId => this.state.players.has(sessionId)
+            );
+
+            this.state.hostSessionId = nextHost ?? "";
+
+            if (nextHost) {
+                const nextHostPlayer = this.state.players.get(nextHost);
+
+                console.log("==================================");
+                console.log("ANFITRIÃO ANTERIOR SAIU:", client.sessionId);
+                console.log("NOVA LIDERANÇA TRANSFERIDA!");
+                console.log("NOVO ANFITRIÃO:", nextHost);
+                console.log(
+                    "JOGADOR:",
+                    nextHostPlayer?.name ?? "Desconhecido"
+                );
+                console.log("==================================");
+            } else {
+                console.log(
+                    "O anfitrião saiu e não existem jogadores restantes."
+                );
+            }
+        }
+
+        this.resetAutoStartCountdown();
+
+        if (
+            this.state.status === "playing" &&
+            wasTheirTurn &&
+            !(
+                this.state.showExtraRollMessage &&
+                wasExtraRollPlayer
+            )
+        ) {
+            this.nextTurn();
+        }
+    }
+
+    // --------------------------------------------------
+    // ENCERRAMENTO DA SALA
+    // --------------------------------------------------
+
+    async onDispose() {
+        this.turnTimeout?.clear();
+        this.autoStartInterval?.clear();
+        this.startDelay?.clear();
+        this.firstPlayerMessageDelay?.clear();
+        this.extraRollMessageDelay?.clear();
+        this.prisonMessageDelay?.clear();
+        this.prisonAttemptDelay?.clear();
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        await this.presence.srem(
+            this.CODE_CHANNEL,
+            this.roomId
+        );
+
+        console.log("Sala encerrada:", this.roomId);
+    }
+
+    // --------------------------------------------------
+    // PRÓXIMO TURNO
+    // --------------------------------------------------
+
+    nextTurn(firstTurnSessionId?: string) {
+        this.turnTimeout?.clear();
+        this.prisonAttemptDelay?.clear();
+        this.prisonAttemptDelay = undefined;
+
+        this.pendingMovementAnnouncement = undefined;
+        this.state.movementAnnouncementPending = false;
+
+        if (this.state.status !== "playing") {
+            return;
+        }
+
+        const previousPlayer = this.state.players.get(
+            this.state.currentTurn
+        );
+
+        if (previousPlayer) {
+            previousPlayer.extraRollAvailable = false;
+            previousPlayer.consecutiveDoubles = 0;
+        }
+
+        const sessionIds = [...this.state.players.keys()];
+
+        if (sessionIds.length === 0) {
+            this.state.currentTurn = "";
+            this.state.turnDeadline = 0;
+            return;
+        }
+
+        if (
+            firstTurnSessionId &&
+            sessionIds.includes(firstTurnSessionId)
+        ) {
+            this.state.currentTurn = firstTurnSessionId;
+        } else {
+            const previous = sessionIds.indexOf(this.state.currentTurn);
+
+            this.state.currentTurn =
+                sessionIds[(previous + 1) % sessionIds.length];
+        }
+
+        this.state.turnCount++;
+
+        this.state.hasRolled = false;
+        this.state.hasMoved = false;
+        this.state.lastRollBy = "";
+        this.state.dice1 = 0;
+        this.state.dice2 = 0;
+
+        const turnSessionId = this.state.currentTurn;
+        const currentPlayer = this.state.players.get(turnSessionId);
+
+        console.log("==================================");
+        console.log("NOVO TURNO:", this.state.turnCount);
+        console.log("JOGADOR:", currentPlayer?.name ?? "Desconhecido");
+        console.log("SESSION ID:", turnSessionId);
+
+        if (currentPlayer?.inPrison) {
+            console.log(
+                "JOGADOR ESTÁ PRESO: aguardando escolha para tentar escapar."
+            );
+        }
+
+        console.log("==================================");
+
+        this.startCurrentTurnTimer(turnSessionId);
+    }
+
+    // --------------------------------------------------
+    // RECONEXÃO
+    // --------------------------------------------------
+
+    onDrop(client: Client, code: CloseCode) {
+        this.allowReconnection(client, 30).catch(() => {});
+    }
+
+    onReconnect(client: Client) {
+        console.log(client.sessionId, "reconectou!");
+    }
+}"
+myroomstate:"import { schema, t, type SchemaType } from "@colyseus/schema";
+
+export const Player = schema({
+    name: t.string().default(""),
+
+    steamId: t.string().default(""),
+
+    score: t.uint16().default(0),
+
+    money: t.uint32().default(2000000),
+
+    color: t.string().default("red"),
+
+    character: t.uint8().default(0),
+
+    position: t.uint8().default(0),
+
+    laps: t.uint16().default(0),
+
+    extraRollAvailable: t.boolean().default(false),
+
+    // Quantidade de duplas consecutivas.
+    consecutiveDoubles: t.uint8().default(0),
+
+    // Movimento especial para a prisão.
+    prisonReturnBackward: t.boolean().default(false),
+
+    lastCellType: t.string().default(""),
+    lastCellName: t.string().default(""),
+
+    inPrison: t.boolean().default(false),
+    prisonAttempts: t.uint8().default(0),
+    debtsAvailable: t.uint8().default(1),
+});
+
+export type Player = SchemaType<typeof Player>;
+
+export const MyRoomState = schema({
+    players: t.map(Player),
+
+    hostSessionId: t.string().default(""),
+    status: t.string().default("waiting"),
+
+    autoStartCountdown: t.uint8().default(0),
+
+    currentTurn: t.string().default(""),
+    turnDeadline: t.number().default(0),
+    turnCount: t.uint16().default(0),
+
+    dice1: t.uint8().default(0),
+    dice2: t.uint8().default(0),
+
+    lastRollBy: t.string().default(""),
+
+    hasRolled: t.boolean().default(false),
+    hasMoved: t.boolean().default(false),
+
+    showFirstPlayerMessage: t.boolean().default(false),
+    firstPlayerName: t.string().default(""),
+    firstPlayerSessionId: t.string().default(""),
+
+    showExtraRollMessage: t.boolean().default(false),
+    extraRollPlayerName: t.string().default(""),
+    extraRollPlayerSessionId: t.string().default(""),
+
+    extraRollReason: t.string().default(""),
+
+    movementAnnouncementPending: t.boolean().default(false),
+
+    showPrisonMessage: t.boolean().default(false),
+    prisonPlayerName: t.string().default(""),
+    prisonPlayerSessionId: t.string().default(""),
+
+    // "normal" ou "triple_doubles".
+    prisonMessageReason: t.string().default(""),
+});
+
+export type MyRoomState = SchemaType<typeof MyRoomState>;"
