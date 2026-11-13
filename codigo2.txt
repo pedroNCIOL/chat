@@ -650,9 +650,17 @@ if (
 menu_avatar_sprite = -1;
 "
 obj_menu step:"
+
 /// obj_menu - Step
 
 var _net = instance_find(obj_network_manager, 0);
+
+// --------------------------------------------------
+// SEGURANCA DOS CONVITES
+// --------------------------------------------------
+
+// Nunca reutilizar destinatarios Steam de cliques anteriores.
+menu_amigos_convite_destino = 0;
 
 // --------------------------------------------------
 // INICIALIZAR JANELA DE ADICIONAR AMIGO
@@ -669,12 +677,17 @@ if (!variable_instance_exists(id, "menu_add_amigo_aberto")) {
 // --------------------------------------------------
 
 if (menu_codigo_amigo_modo_teste) {
+
     menu_amigos_texto_codigo = menu_codigo_amigo_teste;
+
 } else if (steam_api_is_initialized()) {
+
     menu_amigos_texto_codigo = menu_amigos_gerar_codigo(
         steam_user_get_steam_id()
     );
+
 } else {
+
     menu_amigos_texto_codigo = "------";
 }
 
@@ -702,6 +715,7 @@ if (steam_api_is_initialized()) {
                     is_struct(_dados) &&
                     variable_struct_exists(_dados, "connect_string")
                 ) {
+
                     var _menu = instance_find(obj_menu, 0);
 
                     if (_menu != noone) {
@@ -718,16 +732,31 @@ if (steam_api_is_initialized()) {
     menu_amigos_atualizar_frames--;
 
     if (menu_amigos_atualizar_frames <= 0) {
+
         menu_amigos_atualizar();
+
         menu_amigos_atualizar_frames =
             menu_amigos_refresh_interval;
     }
 
 } else {
+
     menu_amigos_steam_disponivel = false;
 }
 
-menu_amigos_filtrar();
+// --------------------------------------------------
+// LISTA DE AMIGOS
+// --------------------------------------------------
+
+// O End Step do obj_friend_bridge prepara a lista
+// visual definitiva, incluindo os amigos Money Town.
+//
+// Nao recalcular uma lista diferente aqui quando
+// esse objeto estiver presente.
+
+if (instance_find(obj_friend_bridge, 0) == noone) {
+    menu_amigos_filtrar();
+}
 
 // --------------------------------------------------
 // MENSAGENS DE AMIZADE E CONVITE
@@ -824,6 +853,7 @@ if (tela_atual == telas.menu && _intro_liberada) {
     );
 
 } else {
+
     menu_lateral_ativa = false;
 }
 
@@ -896,9 +926,16 @@ if (menu_add_amigo_aberto) {
 
     var _filtrado = "";
 
-    for (var _ci = 1; _ci <= string_length(keyboard_string); _ci++) {
+    for (
+        var _ci = 1;
+        _ci <= string_length(keyboard_string);
+        _ci++
+    ) {
 
-        var _caractere = string_char_at(keyboard_string, _ci);
+        var _caractere = string_char_at(
+            keyboard_string,
+            _ci
+        );
 
         if (
             string_pos(_caractere, _permitidos) > 0 &&
@@ -921,7 +958,8 @@ if (menu_add_amigo_aberto) {
         exit;
     }
 
-    var _confirmar_amigo = keyboard_check_pressed(vk_enter);
+    var _confirmar_amigo =
+        keyboard_check_pressed(vk_enter);
 
     if (mouse_check_button_pressed(mb_left)) {
 
@@ -962,6 +1000,9 @@ if (menu_add_amigo_aberto) {
 
         } else {
 
+            // O obj_friend_service envia a solicitacao
+            // ao FriendsRoom utilizando o codigo digitado.
+
             menu_add_amigo_mensagem =
                 "Busca por codigo ainda nao conectada ao servidor.";
         }
@@ -985,9 +1026,9 @@ if (
 
 } else {
 
-    // ----------------------------------------------
-    // PESQUISAR AMIGO DA LISTA
-    // ----------------------------------------------
+    // --------------------------------------------------
+    // PESQUISAR AMIGO
+    // --------------------------------------------------
 
     var _busca_x = _lateral_x + 27;
     var _busca_y = 386;
@@ -1008,6 +1049,7 @@ if (
         );
 
         if (menu_amigos_busca_foco) {
+
             keyboard_string = menu_amigos_busca;
             menu_lateral_scroll_ratio = 0;
         }
@@ -1030,9 +1072,9 @@ if (
         }
     }
 
-    // ----------------------------------------------
+    // --------------------------------------------------
     // MOSTRAR / OCULTAR CODIGO
-    // ----------------------------------------------
+    // --------------------------------------------------
 
     var _codigo_btn_x = _lateral_x + 193;
     var _codigo_btn_y = 260;
@@ -1041,7 +1083,8 @@ if (
 
         if (point_in_rectangle(
             mouse_x, mouse_y,
-            _codigo_btn_x, _codigo_btn_y,
+            _codigo_btn_x,
+            _codigo_btn_y,
             _codigo_btn_x + 18,
             _codigo_btn_y + 18
         )) {
@@ -1051,9 +1094,9 @@ if (
         }
     }
 
-    // ----------------------------------------------
-    // ADICIONAR AMIGO PELO CODIGO DO MONEY TOWN
-    // ----------------------------------------------
+    // --------------------------------------------------
+    // ADICIONAR AMIGO PELO CODIGO
+    // --------------------------------------------------
 
     if (mouse_check_button_pressed(mb_left)) {
 
@@ -1078,9 +1121,9 @@ if (
         }
     }
 
-    // ----------------------------------------------
+    // --------------------------------------------------
     // AREA VISIVEL DA LISTA
-    // ----------------------------------------------
+    // --------------------------------------------------
 
     var _mouse_na_lista = point_in_rectangle(
         mouse_x, mouse_y,
@@ -1089,9 +1132,9 @@ if (
         _area_y + _area_h
     );
 
-    // ----------------------------------------------
-    // RODA DO MOUSE
-    // ----------------------------------------------
+    // --------------------------------------------------
+    // SCROLL DO MOUSE
+    // --------------------------------------------------
 
     if (
         _mouse_na_lista &&
@@ -1099,19 +1142,21 @@ if (
     ) {
 
         if (mouse_wheel_up()) {
+
             menu_lateral_scroll_ratio -=
                 35 / _deslocamento_lista_max;
         }
 
         if (mouse_wheel_down()) {
+
             menu_lateral_scroll_ratio +=
                 35 / _deslocamento_lista_max;
         }
     }
 
-    // ----------------------------------------------
+    // --------------------------------------------------
     // ARRASTAR SCROLLBAR
-    // ----------------------------------------------
+    // --------------------------------------------------
 
     if (mouse_check_button_pressed(mb_left)) {
 
@@ -1146,9 +1191,14 @@ if (
         }
     }
 
-    // ----------------------------------------------
-    // CONVIDAR AMIGO PARA O GRUPO
-    // ----------------------------------------------
+    // --------------------------------------------------
+    // CONVIDAR AMIGO PARA O GRUPO - DESTINO SEGURO
+    // --------------------------------------------------
+
+    // Utilizar a lista visual pronta no End Step.
+    //
+    // NUNCA convidar uma conta Money Town pela Steam.
+    // NUNCA usar um SteamID salvo de outro clique.
 
     if (
         mouse_check_button_pressed(mb_left) &&
@@ -1157,8 +1207,7 @@ if (
     ) {
 
         var _scroll_pixels =
-            menu_lateral_scroll_ratio *
-            _deslocamento_lista_max;
+            menu_lateral_scroll_ratio * _deslocamento_lista_max;
 
         for (
             var _fi = 0;
@@ -1166,11 +1215,17 @@ if (
             _fi++
         ) {
 
-            var _entrada =
-                menu_amigos_exibicao[_fi];
+            var _entrada = menu_amigos_exibicao[_fi];
 
             if (!is_struct(_entrada)) continue;
             if (_entrada.tipo != "amigo") continue;
+
+            if (!variable_struct_exists(
+                _entrada,
+                "amigo"
+            )) {
+                continue;
+            }
 
             var _item_top =
                 _area_y +
@@ -1188,19 +1243,45 @@ if (
             }
 
             if (!point_in_rectangle(
-                mouse_x,
-                mouse_y,
-                _conv_x,
-                _conv_y,
+                mouse_x, mouse_y,
+                _conv_x, _conv_y,
                 _conv_x + 78,
                 _conv_y + 20
             )) {
                 continue;
             }
 
-            // --------------------------------------
-            // IDENTIFICAR SISTEMA DE GRUPOS
-            // --------------------------------------
+            // --------------------------------------------------
+            // IDENTIFICAR AMIGO
+            // --------------------------------------------------
+
+            var _amigo = _entrada.amigo;
+
+            if (!is_struct(_amigo)) break;
+
+            var _nome_alvo = "Jogador";
+
+            if (variable_struct_exists(
+                _amigo,
+                "nome"
+            )) {
+
+                _nome_alvo = string(_amigo.nome);
+            }
+
+            var _origem = "";
+
+            if (variable_struct_exists(
+                _amigo,
+                "origem"
+            )) {
+
+                _origem = string(_amigo.origem);
+            }
+
+            // --------------------------------------------------
+            // VERIFICAR SISTEMA DE GRUPOS
+            // --------------------------------------------------
 
             var _party = instance_find(
                 obj_party_manager,
@@ -1222,7 +1303,7 @@ if (
             ) {
 
                 show_debug_message(
-                    "[PARTY] ERRO: sala party desconectada."
+                    "[PARTY] ERRO: sala de grupos desconectada."
                 );
 
                 break;
@@ -1246,67 +1327,185 @@ if (
                 break;
             }
 
-            // --------------------------------------
-            // IDENTIFICAR AMIGO
-            // --------------------------------------
+            // --------------------------------------------------
+            // IDENTIDADE DO DESTINATARIO
+            // --------------------------------------------------
 
-            var _amigo = _entrada.amigo;
-
-            if (!is_struct(_amigo)) break;
-
-            var _money_town = false;
+            var _id_interno = "";
 
             if (variable_struct_exists(
                 _amigo,
-                "origem"
+                "steam_id_texto"
             )) {
 
-                _money_town =
-                    _amigo.origem == "money_town";
+                _id_interno = string(
+                    _amigo.steam_id_texto
+                );
             }
 
-            var _destino = "";
+            var _id_dev = (
+                string_pos("dev:", _id_interno) == 1
+            );
 
-            if (_money_town) {
+            var _eh_money_town = (
+                _origem == "money_town" ||
+                _id_dev
+            );
 
-                if (variable_struct_exists(
-                    _amigo,
-                    "steam_id_texto"
-                )) {
+            var _eh_steam = (
+                _origem == "steam" &&
+                !_id_dev
+            );
 
-                    _destino = string(
-                        _amigo.steam_id_texto
-                    );
-                }
-
-            } else {
-
-                if (variable_struct_exists(
-                    _amigo,
-                    "steam_id"
-                )) {
-
-                    _destino = string(
-                        _amigo.steam_id
-                    );
-                }
-            }
+            // Nao permitir convite quando a origem
+            // do destinatario for desconhecida.
 
             if (
-                _destino == "" ||
-                _destino == "0"
+                !_eh_money_town &&
+                !_eh_steam
             ) {
 
                 show_debug_message(
-                    "[PARTY] Amigo sem identidade valida."
+                    "[SEGURANCA] Convite bloqueado: origem ambigua. " +
+                    _nome_alvo
                 );
 
                 break;
             }
 
-            // --------------------------------------
-            // ENVIAR CONVITE AO SERVIDOR
-            // --------------------------------------
+            var _destino = "";
+            var _steam_id_real = 0;
+
+            // --------------------------------------------------
+            // DESTINATARIO MONEY TOWN
+            // --------------------------------------------------
+
+            if (_eh_money_town) {
+
+                _destino = _id_interno;
+
+                if (
+                    _destino == "" ||
+                    _destino == "0"
+                ) {
+
+                    show_debug_message(
+                        "[SEGURANCA] Convite Money Town bloqueado: " +
+                        "identidade ausente."
+                    );
+
+                    break;
+                }
+
+                // Contas Money Town sao identificadas
+                // pelo seu ID interno, inclusive dev:.
+                //
+                // Nao existe chamada Steam aqui.
+
+            } else {
+
+                // --------------------------------------------------
+                // DESTINATARIO STEAM
+                // --------------------------------------------------
+
+                if (menu_codigo_amigo_modo_teste) {
+
+                    show_debug_message(
+                        "[SEGURANCA] Convite Steam bloqueado " +
+                        "durante o modo de teste."
+                    );
+
+                    break;
+                }
+
+                if (!variable_struct_exists(
+                    _amigo,
+                    "steam_id"
+                )) {
+
+                    show_debug_message(
+                        "[SEGURANCA] Cartao sem SteamID."
+                    );
+
+                    break;
+                }
+
+                _steam_id_real = _amigo.steam_id;
+                _destino = string(_steam_id_real);
+
+                // Somente SteamIDs de 17 digitos.
+                if (
+                    string_length(_destino) != 17 ||
+                    string_digits(_destino) != _destino
+                ) {
+
+                    show_debug_message(
+                        "[SEGURANCA] SteamID invalido."
+                    );
+
+                    break;
+                }
+
+                // --------------------------------------------------
+                // CONFERIR CONTRA A LISTA STEAM REAL
+                // --------------------------------------------------
+
+                var _steam_confirmado = false;
+
+                for (
+                    var _si = 0;
+                    _si < array_length(menu_amigos);
+                    _si++
+                ) {
+
+                    var _sf = menu_amigos[_si];
+
+                    if (!is_struct(_sf)) continue;
+
+                    if (!variable_struct_exists(
+                        _sf,
+                        "origem"
+                    )) {
+                        continue;
+                    }
+
+                    if (_sf.origem != "steam") continue;
+
+                    if (
+                        string(_sf.steam_id) == _destino &&
+                        string(_sf.nome) == _nome_alvo
+                    ) {
+
+                        _steam_confirmado = true;
+                        break;
+                    }
+                }
+
+                if (!_steam_confirmado) {
+
+                    show_debug_message(
+                        "[SEGURANCA] Convite Steam bloqueado: " +
+                        "cartao nao corresponde ao amigo."
+                    );
+
+                    break;
+                }
+            }
+
+            // --------------------------------------------------
+            // DESTINO VALIDADO
+            // --------------------------------------------------
+
+            show_debug_message(
+                "[PARTY] ALVO CONFIRMADO: " +
+                _nome_alvo +
+                " | origem=" + _origem +
+                " | id=" + _destino
+            );
+
+            // --------------------------------------------------
+            // ENVIAR CONVITE PELO COLYSEUS
+            // --------------------------------------------------
 
             colyseus_send(
                 _party.party_room,
@@ -1316,40 +1515,44 @@ if (
                 }
             );
 
-            show_debug_message(
-                "[PARTY] Convite enviado para " +
-                string(_amigo.nome) +
-                " | destino: " +
-                _destino
-            );
-
-            // --------------------------------------
+            // --------------------------------------------------
             // NOTIFICACAO STEAM
-            // --------------------------------------
+            // --------------------------------------------------
+
+            // Somente uma conta Steam real e validada
+            // pode receber notificacao Steam.
+            //
+            // Contas Money Town jamais passam aqui.
 
             if (
-                !_money_town &&
+                _eh_steam &&
                 _party.party_id != ""
             ) {
 
                 var _steam_ok =
                     steam_friends_invite_user_to_game(
-                        _amigo.steam_id,
+                        _steam_id_real,
                         "MTP|" + _party.party_id
                     );
 
                 show_debug_message(
-                    "[PARTY] Notificacao Steam solicitada: " +
+                    "[PARTY] Convite Steam validado para " +
+                    _nome_alvo +
+                    " | resultado=" +
                     string(_steam_ok)
                 );
             }
 
-            // Nenhuma partida e criada por este clique.
+            menu_amigos_mensagem =
+                "Convite solicitado para " + _nome_alvo;
+
+            menu_amigos_mensagem_frames = 180;
+
             break;
         }
     }
 
-} // FECHAMENTO CORRIGIDO: INTERACOES DA LATERAL
+} // FIM DAS INTERACOES DA LATERAL
 
 // --------------------------------------------------
 // LIMITAR SCROLL
@@ -1420,7 +1623,6 @@ if (
 if (_net != noone && _net.net_game_started) {
 
     _net.net_game_started = false;
-
     room_goto(rm_jogo);
     exit;
 }
@@ -1447,31 +1649,20 @@ if (_net != noone) {
         codigo_sala_privada = _net.net_room_id;
         cor_atual = _net.net_player_color;
 
-        if (menu_amigos_convite_destino != 0) {
+        // --------------------------------------------------
+        // IMPEDIR CONVITES STEAM ATRASADOS
+        // --------------------------------------------------
 
-            var _convite_texto =
-                "MT|" +
-                _net.net_room_mode +
-                "|" +
-                _net.net_room_id;
+        menu_amigos_convite_destino = 0;
 
-            var _convite_ok =
-                steam_friends_invite_user_to_game(
-                    menu_amigos_convite_destino,
-                    _convite_texto
-                );
-
-            menu_amigos_mensagem = _convite_ok
-                ? "Convite enviado!"
-                : "Falha ao enviar convite";
-
-            menu_amigos_mensagem_frames = 180;
-            menu_amigos_convite_destino = 0;
-        }
-
-        for (var i = 0; i < array_length(cores_jogador); i++) {
+        for (
+            var i = 0;
+            i < array_length(cores_jogador);
+            i++
+        ) {
 
             if (cores_jogador[i] == cor_atual) {
+
                 cor_indice = i;
                 break;
             }
@@ -1489,12 +1680,14 @@ if (_net != noone) {
         array_length(_net.net_lobby_rooms);
 
     if (_net.net_connected) {
-        qtd_players = array_length(_net.net_players);
+
+        qtd_players =
+            array_length(_net.net_players);
     }
 }
 
 // --------------------------------------------------
-// BLOQUEIO DURANTE INTRODUCAO
+// BLOQUEIO DURANTE A INTRODUCAO
 // --------------------------------------------------
 
 if (!_intro_liberada) exit;
@@ -1510,7 +1703,11 @@ if (ativo_code) {
 
     var _filtered_code = "";
 
-    for (var i = 1; i <= string_length(keyboard_string); i++) {
+    for (
+        var i = 1;
+        i <= string_length(keyboard_string);
+        i++
+    ) {
 
         var _char = string_char_at(keyboard_string, i);
 
@@ -1518,6 +1715,7 @@ if (ativo_code) {
             string_pos(_char, _allowed) > 0 &&
             string_length(_filtered_code) < 6
         ) {
+
             _filtered_code += _char;
         }
     }
@@ -1534,6 +1732,7 @@ if (ativo_code) {
 
             menu_erro =
                 "O codigo deve ter exatamente 6 caracteres.";
+
             menu_mensagem = "";
 
         } else if (_net == noone) {
@@ -1556,7 +1755,9 @@ if (ativo_code) {
                     personagem_indice
                 );
 
-            } else if (tela_atual == telas.menu_partida_publica) {
+            } else if (
+                tela_atual == telas.menu_partida_publica
+            ) {
 
                 _net.net_join_public(
                     code,
@@ -1589,13 +1790,17 @@ if (mouse_check_button_pressed(mb_left)) {
 
     switch (tela_atual) {
 
-        // ==========================================
+        // ==================================================
         // MENU PRINCIPAL
-        // ==========================================
+        // ==================================================
 
         case telas.menu:
 
-            for (var i = 0; i < array_length(botoes_menu); i++) {
+            for (
+                var i = 0;
+                i < array_length(botoes_menu);
+                i++
+            ) {
 
                 var _left =
                     menu_botoes_x +
@@ -1620,19 +1825,34 @@ if (mouse_check_button_pressed(mb_left)) {
 
                     menu_erro = "";
                     menu_mensagem = "";
+
                     break;
                 }
             }
 
         break;
 
-        // ==========================================
+        // ==================================================
         // CUSTOMIZACAO
-        // ==========================================
+        // ==================================================
 
         case telas.customizacao:
 
-            for (var i = 0; i < array_length(cores_jogador); i++) {
+            // --------------------------------------------------
+            // SELECIONAR COR - CORRIGIDO
+            // --------------------------------------------------
+
+            // A area das cores usa exclusivamente
+            // menu_cores_y e menu_cor_tamanho.
+            //
+            // Nao utilizar _char_y aqui, pois essa
+            // variavel so pertence aos personagens.
+
+            for (
+                var i = 0;
+                i < array_length(cores_jogador);
+                i++
+            ) {
 
                 var _color_left =
                     menu_cores_x +
@@ -1643,15 +1863,23 @@ if (mouse_check_button_pressed(mb_left)) {
 
                 if (point_in_rectangle(
                     _mouse_x, _mouse_y,
-                    _color_left, menu_cores_y,
+                    _color_left,
+                    menu_cores_y,
                     _color_left + menu_cor_tamanho,
-                    _char_y + menu_personagem_botao_altura
+                    menu_cores_y + menu_cor_tamanho
                 )) {
-                    // A logica de cores permanece acima.
+
+                    cor_indice = i;
+                    cor_atual = cores_jogador[i];
+
+                    break;
                 }
             }
 
-            // Selecionar personagens.
+            // --------------------------------------------------
+            // SELECIONAR PERSONAGEM
+            // --------------------------------------------------
+
             for (
                 var _char_index = 0;
                 _char_index < array_length(sprites_personagens);
@@ -1668,6 +1896,7 @@ if (mouse_check_button_pressed(mb_left)) {
                         menu_personagem_botao_espaco_x
                     );
 
+                // _char_y e declarada ANTES de ser usada.
                 var _char_y =
                     menu_personagens_y +
                     _row * (
@@ -1677,16 +1906,24 @@ if (mouse_check_button_pressed(mb_left)) {
 
                 if (point_in_rectangle(
                     _mouse_x, _mouse_y,
-                    _char_x, _char_y,
+                    _char_x,
+                    _char_y,
                     _char_x + menu_personagem_botao_largura,
                     _char_y + menu_personagem_botao_altura
                 )) {
 
                     personagem_indice = _char_index;
-                    personagem_atual = personagens[personagem_indice];
+
+                    personagem_atual =
+                        personagens[personagem_indice];
+
                     break;
                 }
             }
+
+            // --------------------------------------------------
+            // VOLTAR AO MENU
+            // --------------------------------------------------
 
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
@@ -1700,11 +1937,15 @@ if (mouse_check_button_pressed(mb_left)) {
 
         break;
 
-        // ==========================================
+        // ==================================================
         // PARTIDA PRIVADA
-        // ==========================================
+        // ==================================================
 
         case telas.menu_partida_privada:
+
+            // --------------------------------------------------
+            // CRIAR PARTIDA
+            // --------------------------------------------------
 
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
@@ -1723,8 +1964,13 @@ if (mouse_check_button_pressed(mb_left)) {
                         personagem_indice
                     );
                 }
+
                 break;
             }
+
+            // --------------------------------------------------
+            // ENTRAR PELO CODIGO
+            // --------------------------------------------------
 
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
@@ -1733,10 +1979,16 @@ if (mouse_check_button_pressed(mb_left)) {
 
                 ativo_code = true;
                 keyboard_string = code;
+
                 menu_erro = "";
                 menu_mensagem = "";
+
                 break;
             }
+
+            // --------------------------------------------------
+            // VOLTAR
+            // --------------------------------------------------
 
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
@@ -1748,17 +2000,22 @@ if (mouse_check_button_pressed(mb_left)) {
                 keyboard_string = "";
 
                 tela_atual = telas.menu;
+
                 menu_erro = "";
                 menu_mensagem = "";
             }
 
         break;
 
-        // ==========================================
+        // ==================================================
         // PARTIDA PUBLICA
-        // ==========================================
+        // ==================================================
 
         case telas.menu_partida_publica:
+
+            // --------------------------------------------------
+            // VOLTAR
+            // --------------------------------------------------
 
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
@@ -1770,10 +2027,16 @@ if (mouse_check_button_pressed(mb_left)) {
                 keyboard_string = "";
 
                 tela_atual = telas.menu;
+
                 menu_erro = "";
                 menu_mensagem = "";
+
                 break;
             }
+
+            // --------------------------------------------------
+            // ENTRAR POR CODIGO
+            // --------------------------------------------------
 
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
@@ -1782,10 +2045,16 @@ if (mouse_check_button_pressed(mb_left)) {
 
                 ativo_code = true;
                 keyboard_string = code;
+
                 menu_erro = "";
                 menu_mensagem = "";
+
                 break;
             }
+
+            // --------------------------------------------------
+            // PROCURAR PARTIDA
+            // --------------------------------------------------
 
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
@@ -1795,6 +2064,7 @@ if (mouse_check_button_pressed(mb_left)) {
                 if (_net != noone) {
 
                     ativo_code = false;
+
                     menu_erro = "";
                     menu_mensagem = "Procurando partida...";
                     menu_aguardando = true;
@@ -1805,19 +2075,32 @@ if (mouse_check_button_pressed(mb_left)) {
                         personagem_indice
                     );
                 }
+
                 break;
             }
+
+            // --------------------------------------------------
+            // ENTRAR EM SALA DA LISTA
+            // --------------------------------------------------
 
             if (_net != noone) {
 
                 var _visible_count = min(
-                    array_length(_net.net_lobby_rooms), 4
+                    array_length(_net.net_lobby_rooms),
+                    4
                 );
 
-                for (var i = 0; i < _visible_count; i++) {
+                for (
+                    var i = 0;
+                    i < _visible_count;
+                    i++
+                ) {
 
-                    var _room_info = _net.net_lobby_rooms[i];
-                    var _row_top = 180 + i * 100;
+                    var _room_info =
+                        _net.net_lobby_rooms[i];
+
+                    var _row_top =
+                        180 + i * 100;
 
                     if (point_in_rectangle(
                         _mouse_x, _mouse_y,
@@ -1835,6 +2118,7 @@ if (mouse_check_button_pressed(mb_left)) {
                             cor_atual,
                             personagem_indice
                         );
+
                         break;
                     }
                 }
@@ -1842,11 +2126,15 @@ if (mouse_check_button_pressed(mb_left)) {
 
         break;
 
-        // ==========================================
+        // ==================================================
         // LOBBY
-        // ==========================================
+        // ==================================================
 
         case telas.lobby:
+
+            // --------------------------------------------------
+            // SELECIONAR COR NO LOBBY
+            // --------------------------------------------------
 
             if (
                 _net != noone &&
@@ -1854,7 +2142,11 @@ if (mouse_check_button_pressed(mb_left)) {
                 _net.net_game_status == "waiting"
             ) {
 
-                for (var i = 0; i < array_length(cores_jogador); i++) {
+                for (
+                    var i = 0;
+                    i < array_length(cores_jogador);
+                    i++
+                ) {
 
                     var _color_left = 20 + i * 60;
 
@@ -1864,12 +2156,19 @@ if (mouse_check_button_pressed(mb_left)) {
                         _color_left + 50, 200
                     )) {
 
-                        var _requested_color = cores_jogador[i];
+                        var _requested_color =
+                            cores_jogador[i];
+
                         var _color_occupied = false;
 
-                        for (var j = 0; j < array_length(_net.net_players); j++) {
+                        for (
+                            var j = 0;
+                            j < array_length(_net.net_players);
+                            j++
+                        ) {
 
-                            var _other_player = _net.net_players[j];
+                            var _other_player =
+                                _net.net_players[j];
 
                             if (
                                 _other_player.session_id !=
@@ -1878,10 +2177,15 @@ if (mouse_check_button_pressed(mb_left)) {
 
                                 var _other_color =
                                     colyseus_schema_get(
-                                        _other_player.schema, "color"
+                                        _other_player.schema,
+                                        "color"
                                     );
 
-                                if (_other_color == _requested_color) {
+                                if (
+                                    _other_color ==
+                                    _requested_color
+                                ) {
+
                                     _color_occupied = true;
                                     break;
                                 }
@@ -1893,31 +2197,47 @@ if (mouse_check_button_pressed(mb_left)) {
                             colyseus_send(
                                 _net.net_room,
                                 "select_color",
-                                { color: _requested_color }
+                                {
+                                    color: _requested_color
+                                }
                             );
 
                             menu_erro = "";
                         }
+
                         break;
                     }
                 }
             }
 
-            // Sair do lobby.
+            // --------------------------------------------------
+            // SAIR DO LOBBY
+            // --------------------------------------------------
+
             if (point_in_rectangle(
                 _mouse_x, _mouse_y,
                 20, 635, 300, 705
             )) {
 
-                if (_net != noone && _net.net_connected) {
+                if (
+                    _net != noone &&
+                    _net.net_connected
+                ) {
 
                     if (_net.net_room != 0) {
 
-                        if (colyseus_room_is_connected(_net.net_room)) {
-                            colyseus_room_leave(_net.net_room);
+                        if (colyseus_room_is_connected(
+                            _net.net_room
+                        )) {
+
+                            colyseus_room_leave(
+                                _net.net_room
+                            );
                         }
 
-                        colyseus_room_free(_net.net_room);
+                        colyseus_room_free(
+                            _net.net_room
+                        );
                     }
 
                     _net.net_room = 0;
@@ -1933,6 +2253,7 @@ if (mouse_check_button_pressed(mb_left)) {
                     _net.net_game_status = "waiting";
                     _net.net_game_started = false;
                     _net.net_room_mode = "";
+
                     _net.net_auto_start_countdown = 0;
                     _net.net_player_color = "red";
                 }
@@ -1947,17 +2268,23 @@ if (mouse_check_button_pressed(mb_left)) {
 
                 codigo_sala_privada = "";
                 qtd_players = 0;
+
                 menu_erro = "";
                 menu_mensagem = "";
+
                 break;
             }
 
-            // Iniciar partida privada.
+            // --------------------------------------------------
+            // INICIAR PARTIDA PRIVADA
+            // --------------------------------------------------
+
             if (
                 _net != noone &&
                 _net.net_connected &&
                 _net.net_room_mode == "private" &&
-                _net.net_session_id == _net.net_host_session_id &&
+                _net.net_session_id ==
+                _net.net_host_session_id &&
                 array_length(_net.net_players) >= 2
             ) {
 
@@ -1966,16 +2293,24 @@ if (mouse_check_button_pressed(mb_left)) {
                     540, 635, 740, 705
                 )) {
 
-                    colyseus_send(_net.net_room, "start", {});
-                    menu_mensagem = "Iniciando partida...";
+                    colyseus_send(
+                        _net.net_room,
+                        "start",
+                        {}
+                    );
+
+                    menu_mensagem =
+                        "Iniciando partida...";
                 }
             }
 
         break;
     }
 }
+
 "
 obj_menu draw:"
+
 /// obj_menu - Draw
 
 var _mx = mouse_x;
@@ -3284,9 +3619,10 @@ draw_set_color(c_white);
 draw_set_halign(fa_left);
 draw_set_valign(fa_top);
 draw_set_font(-1);
+
 "
 
-obj_menu draw:"
+obj_menu draw gui end:"
 /// obj_menu - Draw GUI End
 
 var _camera_intro = instance_find(
