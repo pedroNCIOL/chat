@@ -6321,3 +6321,1354 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         console.log(client.sessionId, "reconectou!");
     }
 }"
+friendsroom:"
+import { Room, Client } from "colyseus";
+
+import {
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    writeFileSync,
+    renameSync
+} from "node:fs";
+
+import { dirname, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+
+// --------------------------------------------------
+// TIPOS
+// --------------------------------------------------
+
+type Account = {
+    steamId: string;
+    code: string;
+    name: string;
+    friends: string[];
+};
+
+type FriendRequest = {
+    id: string;
+    from: string;
+    to: string;
+    createdAt: number;
+    originInstanceId?: string;
+};
+
+type StoredData = {
+    accounts: Record<string, Account>;
+    requests: FriendRequest[];
+};
+
+type JoinOptions = {
+    steamId?: string;
+    playerName?: string;
+    friendCode?: string;
+    instanceId?: string;
+};
+
+// --------------------------------------------------
+// CONFIGURACOES
+// --------------------------------------------------
+
+const CODE_PATTERN = /^[0-9A-Za-z]{6}$/;
+const STEAM_PATTERN = /^[0-9]{17}$/;
+
+const FRIEND_CODE_ALPHABET =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+const TEST_ACCOUNT_PREFIX = "dev:";
+
+const DEVELOPMENT_MODE =
+    process.env.NODE_ENV !== "production";
+
+const DATA_PATH = resolve(
+    process.cwd(),
+    "data",
+    "money_town_friends.json"
+);
+
+// --------------------------------------------------
+// GERAR CODIGO DA STEAM
+// --------------------------------------------------
+
+function friendCodeFromSteamId(steamId: string): string {
+
+    if (!STEAM_PATTERN.test(steamId)) {
+        throw new Error("SteamID invalido.");
+    }
+
+    let accountId = BigInt(steamId) & 0xFFFFFFFFn;
+    let code = "";
+
+    for (let i = 0; i < 6; i++) {
+        const digit = Number(accountId % 62n);
+
+        code =
+            FRIEND_CODE_ALPHABET[digit] + code;
+
+        accountId /= 62n;
+    }
+
+    return code;
+}
+
+// --------------------------------------------------
+// BANCO DE AMIZADES
+// --------------------------------------------------
+
+class FriendsDatabase {
+
+    private data: StoredData = {
+        accounts: {},
+        requests: []
+    };
+
+    constructor() {
+        this.load();
+    }
+
+    // --------------------------------------------------
+    // CARREGAR
+    // --------------------------------------------------
+
+    private load() {
+
+        if (!existsSync(DATA_PATH)) {
+            return;
+        }
+
+        try {
+
+            const raw = readFileSync(
+                DATA_PATH,
+                "utf8"
+            );
+
+            const parsed = JSON.parse(raw);
+
+            this.data = {
+                accounts: parsed.accounts ?? {},
+                requests: parsed.requests ?? []
+            };
+
+            console.log(
+                "[FRIENDS] Dados carregados."
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[FRIENDS] Erro ao carregar dados:",
+                error
+            );
+
+            throw error;
+        }
+    }
+
+    // --------------------------------------------------
+    // SALVAR
+    // --------------------------------------------------
+
+    save() {
+
+        mkdirSync(
+            dirname(DATA_PATH),
+            { recursive: true }
+        );
+
+        const temporary = DATA_PATH + ".tmp";
+
+        writeFileSync(
+            temporary,
+            JSON.stringify(this.data, null, 2),
+            "utf8"
+        );
+
+        renameSync(
+            temporary,
+            DATA_PATH
+        );
+    }
+
+    // --------------------------------------------------
+    // OBTER CONTA
+    // --------------------------------------------------
+
+    getAccount(steamId: string) {
+        return this.data.accounts[steamId];
+    }
+
+    // --------------------------------------------------
+    // PROCURAR PELO CODIGO
+    // --------------------------------------------------
+
+    getByCode(code: string) {
+
+        return Object.values(
+            this.data.accounts
+        ).find(account => {
+
+            if (
+                account.steamId.startsWith(
+                    TEST_ACCOUNT_PREFIX
+                )
+            ) {
+                return false;
+            }
+
+            if (!STEAM_PATTERN.test(account.steamId)) {
+                return false;
+            }
+
+            return friendCodeFromSteamId(
+                account.steamId
+            ) === code;
+        });
+    }
+
+    // --------------------------------------------------
+    // REGISTRAR CONTA
+    // --------------------------------------------------
+
+    register(
+        steamId: string,
+        name: string,
+        code: string
+    ): Account {
+
+        const existing =
+            this.getAccount(steamId);
+
+        const owner =
+            this.getByCode(code);
+
+        if (
+            owner &&
+            owner.steamId !== steamId
+        ) {
+            throw new Error(
+                "Este codigo ja pertence a outra conta."
+            );
+        }
+
+        if (existing) {
+
+            existing.name = name;
+            existing.code = code;
+
+            this.save();
+
+            return existing;
+        }
+
+        const account: Account = {
+            steamId,
+            code,
+            name,
+            friends: []
+        };
+
+        this.data.accounts[steamId] = account;
+
+        this.save();
+
+        return account;
+    }
+
+    // --------------------------------------------------
+    // OBTER AMIGOS
+    // --------------------------------------------------
+
+    getFriends(steamId: string): Account[] {
+
+        const account = this.getAccount(steamId);
+
+        if (!account) {
+            return [];
+        }
+
+        return account.friends
+            .map(id => this.getAccount(id))
+            .filter(
+                (friend): friend is Account =>
+                    friend !== undefined
+            );
+    }
+
+    // --------------------------------------------------
+    // PEDIDOS PENDENTES
+    // --------------------------------------------------
+
+    getPending(steamId: string) {
+
+        return this.data.requests.filter(
+            request => request.to === steamId
+        );
+    }
+
+    // --------------------------------------------------
+    // IDENTIDADE DE TESTE
+    // --------------------------------------------------
+
+    private getTestAccountId(
+        steamId: string,
+        code?: string
+    ) {
+
+        return code
+            ? `${TEST_ACCOUNT_PREFIX}${steamId}:${code}`
+            : `${TEST_ACCOUNT_PREFIX}${steamId}`;
+    }
+
+    // --------------------------------------------------
+    // CRIAR CONTA SIMULADA
+    // --------------------------------------------------
+
+    private ensureTestAccount(
+        realAccount: Account,
+        code?: string
+    ): Account {
+
+        const virtualId = this.getTestAccountId(
+            realAccount.steamId,
+            code
+        );
+
+        const existing = this.getAccount(virtualId);
+
+        const name = code
+            ? `Jogador ${code} (Teste)`
+            : `${realAccount.name} (Teste)`;
+
+        if (existing) {
+            existing.name = name;
+            return existing;
+        }
+
+        const account: Account = {
+            steamId: virtualId,
+            code: code ?? "__DEV__",
+            name,
+            friends: []
+        };
+
+        this.data.accounts[virtualId] = account;
+
+        return account;
+    }
+
+    // --------------------------------------------------
+    // PEDIDO SIMULADO
+    // --------------------------------------------------
+
+    private createTestRequest(
+        realAccount: Account,
+        code?: string
+    ) {
+
+        if (!DEVELOPMENT_MODE) {
+            throw new Error(
+                "Testes desativados no servidor."
+            );
+        }
+
+        const virtualAccount =
+            this.ensureTestAccount(realAccount, code);
+
+        if (
+            realAccount.friends.includes(
+                virtualAccount.steamId
+            )
+        ) {
+            throw new Error(
+                "Esse jogador de teste ja e seu amigo."
+            );
+        }
+
+        const duplicate = this.data.requests.find(
+            request =>
+                request.from === virtualAccount.steamId &&
+                request.to === realAccount.steamId
+        );
+
+        if (duplicate) {
+            throw new Error(
+                "Ja existe um pedido de teste pendente."
+            );
+        }
+
+        const request: FriendRequest = {
+            id: randomUUID(),
+            from: virtualAccount.steamId,
+            to: realAccount.steamId,
+            createdAt: Date.now()
+        };
+
+        this.data.requests.push(request);
+        this.save();
+
+        console.log(
+            "[FRIENDS DEV] Pedido simulado:",
+            virtualAccount.steamId,
+            "->",
+            realAccount.steamId
+        );
+
+        return {
+            request,
+            target: realAccount,
+            simulated: true
+        };
+    }
+
+    // --------------------------------------------------
+    // CRIAR PEDIDO DE AMIZADE
+    // --------------------------------------------------
+
+    createRequest(from: string, code: string) {
+
+        const sender = this.getAccount(from);
+        const target = this.getByCode(code);
+
+        if (!sender) {
+            throw new Error(
+                "Conta nao registrada."
+            );
+        }
+
+        if (!target) {
+
+            console.warn(
+                "[FRIENDS] Codigo nao registrado:",
+                code,
+                "| Remetente:",
+                from,
+                "| Desenvolvimento:",
+                DEVELOPMENT_MODE
+            );
+
+            if (DEVELOPMENT_MODE) {
+                return this.createTestRequest(
+                    sender,
+                    code
+                );
+            }
+
+            throw new Error(
+                "Codigo de amigo nao encontrado. " +
+                "A conta precisa estar registrada " +
+                "na sala de amigos."
+            );
+        }
+
+        if (target.steamId === from) {
+
+            if (DEVELOPMENT_MODE) {
+                return this.createTestRequest(sender);
+            }
+
+            throw new Error(
+                "Voce nao pode adicionar sua propria conta."
+            );
+        }
+
+        if (
+            sender.friends.includes(
+                target.steamId
+            )
+        ) {
+            throw new Error(
+                "Esse jogador ja e seu amigo."
+            );
+        }
+
+        const duplicate = this.data.requests.find(
+            request =>
+                (
+                    request.from === from &&
+                    request.to === target.steamId
+                ) ||
+                (
+                    request.from === target.steamId &&
+                    request.to === from
+                )
+        );
+
+        if (duplicate) {
+            throw new Error(
+                "Ja existe um pedido de amizade pendente."
+            );
+        }
+
+        const request: FriendRequest = {
+            id: randomUUID(),
+            from,
+            to: target.steamId,
+            createdAt: Date.now()
+        };
+
+        this.data.requests.push(request);
+
+        this.save();
+
+        return {
+            request,
+            target,
+            simulated: false
+        };
+    }
+
+    // --------------------------------------------------
+    // RESPONDER PEDIDO
+    // --------------------------------------------------
+
+    answerRequest(
+        steamId: string,
+        requestId: string,
+        accept: boolean
+    ) {
+
+        const index = this.data.requests.findIndex(
+            request =>
+                request.id === requestId &&
+                request.to === steamId
+        );
+
+        if (index === -1) {
+            throw new Error(
+                "Pedido nao encontrado."
+            );
+        }
+
+        const request = this.data.requests[index];
+
+        const sender = this.getAccount(
+            request.from
+        );
+
+        const target = this.getAccount(
+            request.to
+        );
+
+        if (accept && (!sender || !target)) {
+            throw new Error(
+                "Uma das contas nao existe."
+            );
+        }
+
+        this.data.requests.splice(index, 1);
+
+        if (accept && sender && target) {
+
+            if (
+                !sender.friends.includes(
+                    target.steamId
+                )
+            ) {
+                sender.friends.push(
+                    target.steamId
+                );
+            }
+
+            if (
+                !target.friends.includes(
+                    sender.steamId
+                )
+            ) {
+                target.friends.push(
+                    sender.steamId
+                );
+            }
+        }
+
+        this.save();
+
+        return request;
+    }
+
+    // --------------------------------------------------
+    // REMOVER AMIZADE PERMANENTEMENTE
+    // --------------------------------------------------
+
+    removeFriend(
+        ownerId: string,
+        targetId: string
+    ) {
+
+        if (!ownerId || !targetId) {
+            throw new Error(
+                "Identidade de amizade invalida."
+            );
+        }
+
+        if (ownerId === targetId) {
+            throw new Error(
+                "Nao e possivel remover sua propria conta."
+            );
+        }
+
+        const owner = this.getAccount(ownerId);
+        const target = this.getAccount(targetId);
+
+        if (!owner) {
+            throw new Error(
+                "Conta solicitante nao registrada."
+            );
+        }
+
+        if (!target) {
+            throw new Error(
+                "Conta do amigo nao encontrada."
+            );
+        }
+
+        if (!owner.friends.includes(targetId)) {
+            throw new Error(
+                "Este jogador nao esta na sua lista de amigos."
+            );
+        }
+
+        // Guardar listas originais para restaurar
+        // caso a gravacao falhe.
+        const oldOwnerFriends = [...owner.friends];
+        const oldTargetFriends = [...target.friends];
+
+        // Remover dos dois lados.
+        owner.friends = owner.friends.filter(
+            id => id !== targetId
+        );
+
+        target.friends = target.friends.filter(
+            id => id !== ownerId
+        );
+
+        try {
+
+            // Gravar imediatamente no arquivo JSON.
+            this.save();
+
+        } catch (error) {
+
+            // Nao manter alteracao apenas na memoria
+            // se o arquivo nao puder ser salvo.
+            owner.friends = oldOwnerFriends;
+            target.friends = oldTargetFriends;
+
+            throw error;
+        }
+
+        console.log(
+            "[FRIENDS] AMIZADE REMOVIDA E SALVA:",
+            ownerId,
+            "<->",
+            targetId
+        );
+
+        return true;
+    }
+
+    // --------------------------------------------------
+    // CONTA DE TESTE
+    // --------------------------------------------------
+
+    isTestAccount(steamId: string) {
+
+        return steamId.startsWith(
+            TEST_ACCOUNT_PREFIX
+        );
+    }
+}
+
+// --------------------------------------------------
+// BANCO COMPARTILHADO
+// --------------------------------------------------
+
+const database = new FriendsDatabase();
+
+// --------------------------------------------------
+// SALA FRIENDSROOM
+// --------------------------------------------------
+
+export class FriendsRoom extends Room {
+
+    maxClients = 1000;
+    autoDispose = false;
+
+    private sessions = new Map<string, string>();
+
+    private sessionInstances =
+        new Map<string, string>();
+
+    private requestOriginSessions =
+        new Map<string, string>();
+
+    // --------------------------------------------------
+    // CRIAR SALA
+    // --------------------------------------------------
+
+    onCreate() {
+
+        console.log(
+            "[FRIENDS] Sala de amizades iniciada."
+        );
+
+        console.log(
+            "[FRIENDS] Modo de desenvolvimento:",
+            DEVELOPMENT_MODE
+        );
+
+        // ==============================================
+        // RECEBER PEDIDO DE AMIZADE
+        // ==============================================
+
+        this.onMessage(
+            "friend_request",
+            (client, message) => {
+
+                try {
+
+                    const senderId =
+                        this.sessions.get(
+                            client.sessionId
+                        );
+
+                    if (!senderId) {
+                        throw new Error(
+                            "Conta nao identificada."
+                        );
+                    }
+
+                    const code = String(
+                        message?.code ?? ""
+                    ).trim();
+
+                    if (!CODE_PATTERN.test(code)) {
+                        throw new Error(
+                            "O codigo deve ter 6 caracteres."
+                        );
+                    }
+
+                    const result =
+                        database.createRequest(
+                            senderId,
+                            code
+                        );
+
+                    client.send(
+                        "friend_request_result",
+                        {
+                            ok: true,
+                            message: result.simulated
+                                ? "Pedido de teste enviado."
+                                : "Pedido de amizade enviado.",
+                            requestId: result.request.id
+                        }
+                    );
+
+                    const originInstanceId =
+                        String(
+                            message?.instanceId ?? ""
+                        ).trim() ||
+                        this.sessionInstances.get(
+                            client.sessionId
+                        ) ||
+                        client.sessionId;
+
+                    result.request.originInstanceId =
+                        originInstanceId;
+
+                    database.save();
+
+                    this.requestOriginSessions.set(
+                        result.request.id,
+                        client.sessionId
+                    );
+
+                    this.sendToAccount(
+                        result.target.steamId,
+                        "friend_request_received",
+                        this.serializeRequest(
+                            result.request
+                        ),
+                        client.sessionId,
+                        originInstanceId
+                    );
+
+                    console.log(
+                        "[FRIENDS] Pedido enviado:",
+                        result.request.from,
+                        "->",
+                        result.request.to
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[FRIENDS] Erro no pedido:",
+                        error
+                    );
+
+                    client.send(
+                        "friend_request_result",
+                        {
+                            ok: false,
+                            message: this.errorText(error)
+                        }
+                    );
+                }
+            }
+        );
+
+        // ==============================================
+        // RESPONDER PEDIDO
+        // ==============================================
+
+        this.onMessage(
+            "friend_response",
+            (client, message) => {
+
+                try {
+
+                    const steamId =
+                        this.sessions.get(
+                            client.sessionId
+                        );
+
+                    if (!steamId) {
+                        throw new Error(
+                            "Conta nao identificada."
+                        );
+                    }
+
+                    const requestId = String(
+                        message?.requestId ?? ""
+                    );
+
+                    const accept =
+                        message?.accept === true;
+
+                    const request =
+                        database.answerRequest(
+                            steamId,
+                            requestId,
+                            accept
+                        );
+
+                    this.requestOriginSessions.delete(
+                        request.id
+                    );
+
+                    client.send(
+                        "friend_response_result",
+                        {
+                            ok: true,
+                            requestId,
+                            accepted: accept
+                        }
+                    );
+
+                    if (
+                        !database.isTestAccount(
+                            request.from
+                        )
+                    ) {
+
+                        this.sendToAccount(
+                            request.from,
+                            "friend_request_answered",
+                            {
+                                requestId,
+                                accepted: accept,
+                                by: request.to
+                            }
+                        );
+                    }
+
+                    this.broadcastFriends(
+                        request.from
+                    );
+
+                    this.broadcastFriends(
+                        request.to
+                    );
+
+                    console.log(
+                        "[FRIENDS] Pedido",
+                        requestId,
+                        accept ? "ACEITO" : "RECUSADO"
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[FRIENDS] Erro na resposta:",
+                        error
+                    );
+
+                    client.send(
+                        "friend_response_result",
+                        {
+                            ok: false,
+                            message: this.errorText(error)
+                        }
+                    );
+                }
+            }
+        );
+
+        // ==============================================
+        // REMOVER AMIZADE
+        // ==============================================
+
+        this.onMessage(
+            "friend_remove",
+            (client, message) => {
+
+                const ownerId =
+                    this.sessions.get(
+                        client.sessionId
+                    );
+
+                const targetId =
+                    String(
+                        message?.steamId ?? ""
+                    ).trim();
+
+                console.log(
+                    "[FRIENDS] REMOVE RECEBIDO:",
+                    ownerId ?? "SEM CONTA",
+                    "->",
+                    targetId || "SEM ALVO"
+                );
+
+                try {
+
+                    if (!ownerId) {
+                        throw new Error(
+                            "Conta nao identificada."
+                        );
+                    }
+
+                    // Remover efetivamente do banco.
+                    database.removeFriend(
+                        ownerId,
+                        targetId
+                    );
+
+                    // Confirmar a operacao ao cliente.
+                    client.send(
+                        "friend_remove_result",
+                        {
+                            ok: true,
+                            steamId: targetId,
+                            message: "Amizade removida."
+                        }
+                    );
+
+                    // Enviar a nova lista para TODAS
+                    // as instancias conectadas dos dois.
+                    this.broadcastFriends(ownerId);
+                    this.broadcastFriends(targetId);
+
+                    console.log(
+                        "[FRIENDS] Lista atualizada apos remocao."
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "[FRIENDS] FALHA AO REMOVER:",
+                        error
+                    );
+
+                    client.send(
+                        "friend_remove_result",
+                        {
+                            ok: false,
+                            steamId: targetId,
+                            message: this.errorText(error)
+                        }
+                    );
+                }
+            }
+        );
+
+        // ==============================================
+        // CONSULTAR LISTA
+        // ==============================================
+
+        this.onMessage(
+            "friend_list",
+            client => {
+
+                const steamId =
+                    this.sessions.get(
+                        client.sessionId
+                    );
+
+                if (steamId) {
+                    this.sendFriends(
+                        client,
+                        steamId
+                    );
+                }
+            }
+        );
+    }
+
+    // --------------------------------------------------
+    // ENTRAR NA SALA
+    // --------------------------------------------------
+
+    onJoin(client: Client, options: JoinOptions) {
+
+        try {
+
+            const steamId = String(
+                options?.steamId ?? ""
+            ).trim();
+
+            const playerName = String(
+                options?.playerName ?? "Jogador"
+            ).slice(0, 64);
+
+            const suppliedFriendCode = String(
+                options?.friendCode ?? ""
+            ).trim();
+
+            if (!STEAM_PATTERN.test(steamId)) {
+                throw new Error(
+                    "SteamID invalido."
+                );
+            }
+
+            const friendCode =
+                friendCodeFromSteamId(steamId);
+
+            if (suppliedFriendCode !== friendCode) {
+
+                console.log(
+                    "[FRIENDS] Codigo informado difere " +
+                    "do calculado:",
+                    suppliedFriendCode || "(vazio)",
+                    "->",
+                    friendCode
+                );
+            }
+
+            const account = database.register(
+                steamId,
+                playerName,
+                friendCode
+            );
+
+            const explicitInstanceId = String(
+                options?.instanceId ?? ""
+            ).trim();
+
+            const instanceId =
+                explicitInstanceId ||
+                (
+                    suppliedFriendCode &&
+                    suppliedFriendCode !== friendCode
+                        ? suppliedFriendCode
+                        : client.sessionId
+                );
+
+            this.sessions.set(
+                client.sessionId,
+                steamId
+            );
+
+            this.sessionInstances.set(
+                client.sessionId,
+                instanceId
+            );
+
+            console.log(
+                "[FRIENDS] Sessao registrada:",
+                client.sessionId,
+                "| Instancia:",
+                instanceId
+            );
+
+            client.send(
+                "friend_registered",
+                {
+                    ok: true,
+                    code: account.code,
+                    steamId: account.steamId
+                }
+            );
+
+            this.sendFriends(
+                client,
+                steamId
+            );
+
+            const pending =
+                database.getPending(steamId);
+
+            for (const request of pending) {
+
+                if (
+                    database.isTestAccount(
+                        request.from
+                    ) &&
+                    !request.originInstanceId
+                ) {
+                    continue;
+                }
+
+                if (
+                    request.originInstanceId === instanceId ||
+                    this.requestOriginSessions.get(
+                        request.id
+                    ) === client.sessionId
+                ) {
+                    continue;
+                }
+
+                client.send(
+                    "friend_request_received",
+                    this.serializeRequest(request)
+                );
+            }
+
+            this.broadcastFriends(steamId);
+
+            console.log(
+                "[FRIENDS] Conta conectada:",
+                account.name,
+                "| Codigo:",
+                account.code
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[FRIENDS] Erro no cadastro:",
+                error
+            );
+
+            client.send(
+                "friend_registered",
+                {
+                    ok: false,
+                    message: this.errorText(error)
+                }
+            );
+        }
+    }
+
+    // --------------------------------------------------
+    // SAIR DA SALA
+    // --------------------------------------------------
+
+    onLeave(client: Client) {
+
+        const steamId =
+            this.sessions.get(
+                client.sessionId
+            );
+
+        this.sessions.delete(
+            client.sessionId
+        );
+
+        this.sessionInstances.delete(
+            client.sessionId
+        );
+
+        if (steamId) {
+            this.broadcastFriends(steamId);
+        }
+    }
+
+    // --------------------------------------------------
+    // VERIFICAR STATUS ONLINE
+    // --------------------------------------------------
+
+    private isOnline(steamId: string) {
+
+        for (const id of this.sessions.values()) {
+
+            if (id === steamId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // --------------------------------------------------
+    // SERIALIZAR PEDIDO
+    // --------------------------------------------------
+
+    private serializeRequest(
+        request: FriendRequest
+    ) {
+
+        const sender =
+            database.getAccount(
+                request.from
+            );
+
+        const simulated =
+            database.isTestAccount(
+                request.from
+            );
+
+        if (simulated) {
+
+            const realAccount =
+                database.getAccount(
+                    request.to
+                );
+
+            return {
+                requestId: request.id,
+                steamId: request.to,
+                name: sender?.name ??
+                    (
+                        realAccount
+                            ? realAccount.name + " (Teste)"
+                            : "Jogador (Teste)"
+                    ),
+                code: sender?.code ?? "__DEV__",
+                simulated: true
+            };
+        }
+
+        return {
+            requestId: request.id,
+            steamId: request.from,
+            name: sender?.name ?? "Jogador",
+            code: sender?.code ?? "------",
+            simulated: false
+        };
+    }
+
+    // --------------------------------------------------
+    // ENVIAR LISTA DE AMIGOS
+    // --------------------------------------------------
+
+    private sendFriends(
+        client: Client,
+        steamId: string
+    ) {
+
+        const friends = database.getFriends(
+            steamId
+        ).map(account => {
+
+            const simulated =
+                database.isTestAccount(
+                    account.steamId
+                );
+
+            return {
+                steamId: account.steamId,
+                name: account.name,
+                code: account.code,
+                online: simulated
+                    ? false
+                    : this.isOnline(account.steamId),
+                simulated
+            };
+        });
+
+        // Enviar nos dois formatos para manter
+        // compatibilidade com o GameMaker.
+        client.send(
+            "friend_list_result",
+            {
+                friends,
+                friendsJson: JSON.stringify(friends)
+            }
+        );
+    }
+
+    // --------------------------------------------------
+    // ENVIAR MENSAGEM A UMA CONTA
+    // --------------------------------------------------
+
+    private sendToAccount(
+        steamId: string,
+        type: string,
+        data: unknown,
+        excludeSessionId?: string,
+        excludeInstanceId?: string
+    ) {
+
+        for (const client of this.clients) {
+
+            if (
+                client.sessionId !== excludeSessionId &&
+                (
+                    !excludeInstanceId ||
+                    this.sessionInstances.get(
+                        client.sessionId
+                    ) !== excludeInstanceId
+                ) &&
+                this.sessions.get(
+                    client.sessionId
+                ) === steamId
+            ) {
+
+                client.send(type, data);
+            }
+        }
+    }
+
+    // --------------------------------------------------
+    // ATUALIZAR AMIGOS CONECTADOS
+    // --------------------------------------------------
+
+    private broadcastFriends(steamId: string) {
+
+        const affected = new Set<string>();
+
+        affected.add(steamId);
+
+        for (
+            const account of database.getFriends(
+                steamId
+            )
+        ) {
+            affected.add(account.steamId);
+        }
+
+        for (const client of this.clients) {
+
+            const connectedId =
+                this.sessions.get(
+                    client.sessionId
+                );
+
+            if (
+                connectedId &&
+                affected.has(connectedId)
+            ) {
+
+                this.sendFriends(
+                    client,
+                    connectedId
+                );
+            }
+        }
+    }
+
+    // --------------------------------------------------
+    // TEXTO DE ERRO
+    // --------------------------------------------------
+
+    private errorText(error: unknown) {
+
+        return error instanceof Error
+            ? error.message
+            : "Erro desconhecido.";
+    }
+}
+"
