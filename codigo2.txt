@@ -5,7 +5,8 @@ enum telas {
     menu,
     menu_partida_privada,
     lobby,
-    menu_partida_publica
+    menu_partida_publica,
+    customizacao
 }
 
 enum personagem {
@@ -17,11 +18,27 @@ enum personagem {
 
 tela_atual = telas.menu;
 
-botoes_menu = ["Partida Privada", "Partida Publica"];
+// --------------------------------------------------
+// BOTÕES DO MENU PRINCIPAL
+// --------------------------------------------------
+
+botoes_menu = [
+    "Partida Privada",
+    "Partida Publica",
+    "Customizacao"
+];
+
 botoes_funcao = [
     telas.menu_partida_privada,
-    telas.menu_partida_publica
+    telas.menu_partida_publica,
+    telas.customizacao
 ];
+
+menu_botoes_x = 190;
+menu_botoes_y = 260;
+menu_botoes_largura = 250;
+menu_botoes_altura = 75;
+menu_botoes_espaco = 25;
 
 // --------------------------------------------------
 // PERSONAGENS
@@ -86,15 +103,27 @@ menu_perfil_tamanho = 80;
 menu_nome_x = 115;
 menu_nome_y = 26;
 
+// Seleção de cor.
 menu_cores_x = 115;
-menu_cores_y = 72;
+menu_cores_y = 165;
 menu_cor_tamanho = 36;
 menu_cor_espaco = 7;
 
-menu_personagem_x = 300;
-menu_personagem_y = 72;
-menu_personagem_largura = 85;
-menu_personagem_altura = 36;
+// --------------------------------------------------
+// BOTÕES DE PERSONAGEM
+// GRADE 2x2 CENTRALIZADA
+// --------------------------------------------------
+
+menu_personagens_x = 472.5;
+menu_personagens_y = 210;
+
+menu_personagens_titulo_x = menu_personagens_x;
+menu_personagens_titulo_y = 165;
+
+menu_personagem_botao_largura = 150;
+menu_personagem_botao_altura = 150;
+menu_personagem_botao_espaco_x = 35;
+menu_personagem_botao_espaco_y = 35;
 
 // --------------------------------------------------
 // CRIAR SPRITE A PARTIR DA IMAGEM STEAM
@@ -104,8 +133,6 @@ menu_criar_avatar = function(_imagem) {
 
     if (_imagem <= 0) return false;
 
-    // Steamworks 3.0.0:
-    // Retorna struct com width e height.
     var _dimensoes = steam_utils_get_image_size(_imagem);
 
     if (!is_struct(_dimensoes)) return false;
@@ -131,15 +158,12 @@ menu_criar_avatar = function(_imagem) {
         1
     );
 
-    // Steamworks 3.0.0:
-    // Esta função recebe somente 2 argumentos.
     var _sucesso = steam_utils_get_image_rgba(
         _imagem,
         _buffer
     );
 
     if (!_sucesso) {
-
         buffer_delete(_buffer);
         return false;
     }
@@ -147,19 +171,16 @@ menu_criar_avatar = function(_imagem) {
     var _surface = surface_create(_largura, _altura);
 
     if (!surface_exists(_surface)) {
-
         buffer_delete(_buffer);
         return false;
     }
 
-    // Copiar pixels da Steam para a surface.
     buffer_set_surface(
         _buffer,
         _surface,
         0
     );
 
-    // Criar sprite dinâmico.
     var _novo_sprite = sprite_create_from_surface(
         _surface,
         0,
@@ -177,7 +198,6 @@ menu_criar_avatar = function(_imagem) {
 
     if (_novo_sprite == -1) return false;
 
-    // Liberar sprite antigo, se existir.
     if (menu_avatar_sprite != -1) {
 
         if (sprite_exists(menu_avatar_sprite)) {
@@ -243,22 +263,122 @@ partida_selecionada = -1;
 
 qtd_players = 0;
 "
-obj_menu step:"
-/// obj_menu - Step
+
+obj_menu step:"/// obj_menu - Step
 
 var _net = instance_find(obj_network_manager, 0);
+
+// --------------------------------------------------
+// ANIMACAO DA LATERAL (LIMITE 125 / 273)
+// --------------------------------------------------
+
+if (!variable_instance_exists(id, "menu_lateral_abertura")) {
+    menu_lateral_abertura = 0;
+    menu_botoes_deslocamento = 0;
+}
+if (!variable_instance_exists(id, "menu_lateral_ativa")) {
+    menu_lateral_ativa = false;
+}
+if (!variable_instance_exists(id, "menu_amigos_scroll")) {
+    menu_amigos_scroll = 0;
+    menu_amigos_arrastando = false;
+    menu_amigos_arrasto_offset = 0;
+}
+
+var _alvo_lateral = 0;
+var _alvo_botoes = 0;
+
+if (tela_atual == telas.menu) {
+    var _limite_deteccao = 125;
+    if (menu_lateral_ativa) _limite_deteccao = 273;
+
+    menu_lateral_ativa = (
+        mouse_x >= 0 && mouse_x <= _limite_deteccao &&
+        mouse_y >= 0 && mouse_y <= 720
+    );
+
+    if (menu_lateral_ativa) {
+        _alvo_lateral = 272;
+        _alvo_botoes = 272;
+    }
+} else {
+    menu_lateral_ativa = false;
+}
+
+menu_lateral_abertura = lerp(menu_lateral_abertura, _alvo_lateral, 0.3);
+menu_botoes_deslocamento = lerp(menu_botoes_deslocamento, _alvo_botoes, 0.3);
+if (abs(menu_lateral_abertura - _alvo_lateral) < 0.1) menu_lateral_abertura = _alvo_lateral;
+if (abs(menu_botoes_deslocamento - _alvo_botoes) < 0.1) menu_botoes_deslocamento = _alvo_botoes;
+
+// --------------------------------------------------
+// SCROLLBAR DA LISTA DE AMIGOS (SEM DADOS AINDA)
+// --------------------------------------------------
+
+// Todos os sprites da lateral usam origem top-left.
+// O trilho comeca na area inferior do painel (imagem de referencia).
+var _barra_visual_x = menu_lateral_abertura - 274 + 2 * (menu_lateral_abertura / 272);
+var _lista_topo = 383;
+var _scroll_x = _barra_visual_x + 7;
+var _scroll_y = _lista_topo;
+var _scroll_largura = sprite_get_width(spr_scroll_bar);
+var _scroll_altura = sprite_get_height(spr_scroll_bar);
+var _scroll_botao_largura = sprite_get_width(spr_scroll_bar_button);
+var _scroll_botao_altura = sprite_get_height(spr_scroll_bar_button);
+
+// Limitar o arraste a area visivel 1280x720.
+var _trilho_altura = min(_scroll_altura, 720 - _scroll_y - 8);
+var _scroll_percurso = max(0, _trilho_altura - _scroll_botao_altura);
+var _bolinha_y = _scroll_y + menu_amigos_scroll * _scroll_percurso;
+var _lista_mouse = (
+    mouse_x >= 0 && mouse_x <= 273 &&
+    mouse_y >= _lista_topo && mouse_y <= 720
+);
+var _lateral_interativa = (
+    tela_atual == telas.menu && menu_lateral_ativa &&
+    menu_lateral_abertura >= 270
+);
+
+if (!_lateral_interativa) {
+    menu_amigos_arrastando = false;
+} else {
+    if (_lista_mouse) {
+        if (mouse_wheel_up()) menu_amigos_scroll = clamp(menu_amigos_scroll - 0.08, 0, 1);
+        if (mouse_wheel_down()) menu_amigos_scroll = clamp(menu_amigos_scroll + 0.08, 0, 1);
+    }
+
+    if (mouse_check_button_pressed(mb_left)) {
+        if (point_in_rectangle(
+            mouse_x, mouse_y,
+            _scroll_x - 3, _bolinha_y,
+            _scroll_x + max(_scroll_largura, _scroll_botao_largura) + 3,
+            _bolinha_y + _scroll_botao_altura
+        )) {
+            menu_amigos_arrastando = true;
+            menu_amigos_arrasto_offset = mouse_y - _bolinha_y;
+        }
+    }
+
+    if (menu_amigos_arrastando) {
+        if (mouse_check_button(mb_left)) {
+            if (_scroll_percurso > 0) {
+                menu_amigos_scroll = clamp(
+                    (mouse_y - menu_amigos_arrasto_offset - _scroll_y) / _scroll_percurso,
+                    0, 1
+                );
+            }
+        } else {
+            menu_amigos_arrastando = false;
+        }
+    }
+}
 
 // --------------------------------------------------
 // ATUALIZAR IDENTIDADE STEAM
 // --------------------------------------------------
 
 var _steam = instance_find(obj_steam, 0);
-
 if (_steam != noone) {
-
-    if (_steam.steam_player_name != "") {
-        nome_jogador = _steam.steam_player_name;
-    }
+    if (_steam.steam_player_name != "") nome_jogador = _steam.steam_player_name;
 }
 
 // --------------------------------------------------
@@ -266,170 +386,98 @@ if (_steam != noone) {
 // --------------------------------------------------
 
 if (!menu_avatar_carregado) {
-
     if (steam_api_is_initialized()) {
-
         if (menu_avatar_timer <= 0) {
-
-            // Steamworks 3.0.0.
             var _steam_id = steam_user_get_steam_id();
-
-            // Avatar médio: 64x64 pixels.
-            var _imagem = steam_friends_get_large_friend_avatar(
-                _steam_id
-            );
-
-            if (_imagem > 0) {
-
-                menu_criar_avatar(_imagem);
-
-            } else {
-
-                // Se ainda não estiver disponível,
-                // tentar novamente posteriormente.
-                if (_imagem == -1) {
-
-                    show_debug_message(
-                        "Aguardando avatar da Steam..."
-                    );
-                }
-            }
-
+            var _imagem = steam_friends_get_large_friend_avatar(_steam_id);
+            if (_imagem > 0) menu_criar_avatar(_imagem);
+            else if (_imagem == -1) show_debug_message("Aguardando avatar da Steam...");
             menu_avatar_timer = 30;
-
         } else {
-
             menu_avatar_timer--;
         }
     }
 }
 
 // --------------------------------------------------
-// VERIFICAR SE A PARTIDA COMEÇOU
+// VERIFICAR INICIO DA PARTIDA
 // --------------------------------------------------
 
 if (_net != noone && _net.net_game_started) {
-
     _net.net_game_started = false;
-
     room_goto(rm_jogo);
     exit;
 }
 
 // --------------------------------------------------
-// VERIFICAR CONEXÃO
+// VERIFICAR CONEXAO
 // --------------------------------------------------
 
 if (_net != noone) {
-
     if (_net.net_connected && !menu_conexao_anterior) {
-
         menu_conexao_anterior = true;
         menu_aguardando = false;
-
         tela_atual = telas.lobby;
-
         ativo_code = false;
         menu_erro = "";
         menu_mensagem = "";
-
         codigo_sala_privada = _net.net_room_id;
-
         cor_atual = _net.net_player_color;
-
         for (var i = 0; i < array_length(cores_jogador); i++) {
-
-            if (cores_jogador[i] == cor_atual) {
-
-                cor_indice = i;
-                break;
-            }
+            if (cores_jogador[i] == cor_atual) { cor_indice = i; break; }
         }
     }
-
     if (_net.net_error != "") {
-
         menu_erro = _net.net_error;
         menu_aguardando = false;
     }
-
     partidas_existentes = array_length(_net.net_lobby_rooms);
-
-    if (_net.net_connected) {
-        qtd_players = array_length(_net.net_players);
-    }
+    if (_net.net_connected) qtd_players = array_length(_net.net_players);
 }
 
 // --------------------------------------------------
-// DIGITAÇÃO DOS CÓDIGOS
+// BLOQUEAR INTERACAO DURANTE A INTRODUCAO
+// --------------------------------------------------
+
+var _camera_intro = instance_find(obj_camera, 0);
+if (_camera_intro != noone && !_camera_intro.intro_finalizada) exit;
+
+// --------------------------------------------------
+// DIGITACAO DE CODIGOS
 // --------------------------------------------------
 
 if (ativo_code) {
-
     var _allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     var _filtered_code = "";
-
     for (var i = 1; i <= string_length(keyboard_string); i++) {
-
         var _char = string_char_at(keyboard_string, i);
-
-        if (string_pos(_char, _allowed) > 0) {
-
-            if (string_length(_filtered_code) < 6) {
-                _filtered_code += _char;
-            }
+        if (string_pos(_char, _allowed) > 0 && string_length(_filtered_code) < 6) {
+            _filtered_code += _char;
         }
     }
-
     code = _filtered_code;
     keyboard_string = code;
 
     if (keyboard_check_pressed(vk_enter)) {
-
         ativo_code = false;
         code = string_trim(code);
-
         if (string_length(code) != 6) {
-
             menu_erro = "O código deve ter exatamente 6 caracteres.";
             menu_mensagem = "";
-
-        }
-        else if (_net == noone) {
-
+        } else if (_net == noone) {
             menu_erro = "Gerenciador de rede não encontrado.";
-
-        }
-        else {
-
+        } else {
             menu_erro = "";
             menu_mensagem = "Verificando sala...";
             menu_aguardando = true;
-
             if (tela_atual == telas.menu_partida_privada) {
-
-                _net.net_join_private(
-                    code,
-                    nome_jogador,
-                    cor_atual,
-                    personagem_indice
-                );
-
-            }
-            else if (tela_atual == telas.menu_partida_publica) {
-
-                _net.net_join_public(
-                    code,
-                    nome_jogador,
-                    cor_atual,
-                    personagem_indice
-                );
+                _net.net_join_private(code, nome_jogador, cor_atual, personagem_indice);
+            } else if (tela_atual == telas.menu_partida_publica) {
+                _net.net_join_public(code, nome_jogador, cor_atual, personagem_indice);
             }
         }
     }
-
     if (keyboard_check_pressed(vk_escape)) {
-
         ativo_code = false;
         code = "";
         keyboard_string = "";
@@ -437,1324 +485,667 @@ if (ativo_code) {
 }
 
 // --------------------------------------------------
-// CLIQUES DO MENU
+// CLIQUES DO MENU - AREA 1280x720
 // --------------------------------------------------
 
 if (mouse_check_button_pressed(mb_left)) {
-
-    var _room_x = room_width;
-    var _room_y = room_height;
-
-    if (menu_aguardando) {
-        exit;
-    }
+    var _mouse_x = mouse_x;
+    var _mouse_y = mouse_y;
+    if (menu_aguardando) exit;
 
     switch (tela_atual) {
-
-        // ==========================================
-        // MENU PRINCIPAL
-        // ==========================================
-
         case telas.menu:
-
-            // --------------------------------------
-            // TROCAR PERSONAGEM
-            // --------------------------------------
-
-            if (point_in_rectangle(
-                mouse_x,
-                mouse_y,
-                menu_personagem_x,
-                menu_personagem_y,
-                menu_personagem_x + menu_personagem_largura,
-                menu_personagem_y + menu_personagem_altura
-            )) {
-
-                personagem_indice++;
-
-                if (personagem_indice >= array_length(personagens)) {
-                    personagem_indice = 0;
-                }
-
-                personagem_atual = personagens[personagem_indice];
-            }
-
-            // --------------------------------------
-            // SELECIONAR COR
-            // --------------------------------------
-
-            for (var i = 0; i < array_length(cores_jogador); i++) {
-
-                var _color_left =
-                    menu_cores_x +
-                    i * (menu_cor_tamanho + menu_cor_espaco);
-
-                var _color_right =
-                    _color_left + menu_cor_tamanho;
-
-                if (point_in_rectangle(
-                    mouse_x,
-                    mouse_y,
-                    _color_left,
-                    menu_cores_y,
-                    _color_right,
-                    menu_cores_y + menu_cor_tamanho
-                )) {
-
-                    cor_indice = i;
-                    cor_atual = cores_jogador[i];
-
-                    break;
-                }
-            }
-
-            // --------------------------------------
-            // BOTÕES PRINCIPAIS
-            // --------------------------------------
-
-            var _b1 = (_room_y / 2) - 100;
-            var _b2 = (_room_y / 2) - 25;
-            var _b3 = (_room_x / 2) - 450;
-
-            for (var i = 0; i < 2; i++) {
-
-                var _left = _b3 + i * 300;
-                var _right = _left + 250;
-
-                if (point_in_rectangle(
-                    mouse_x,
-                    mouse_y,
-                    _left,
-                    _b1,
-                    _right,
-                    _b2
-                )) {
-
+            // Convidar/adicionar ainda sao apenas visuais.
+            // A bolinha da scrollbar e controlada acima.
+            for (var i = 0; i < array_length(botoes_menu); i++) {
+                var _left = menu_botoes_x + menu_botoes_deslocamento +
+                    i * (menu_botoes_largura + menu_botoes_espaco);
+                if (point_in_rectangle(_mouse_x, _mouse_y,
+                    _left, menu_botoes_y,
+                    _left + menu_botoes_largura,
+                    menu_botoes_y + menu_botoes_altura)) {
                     tela_atual = botoes_funcao[i];
-
                     ativo_code = false;
                     code = "";
                     keyboard_string = "";
-
                     menu_erro = "";
                     menu_mensagem = "";
+                    break;
                 }
             }
-
         break;
 
-        // ==========================================
-        // MENU PRIVADO
-        // ==========================================
+        case telas.customizacao:
+            for (var i = 0; i < array_length(cores_jogador); i++) {
+                var _color_left = menu_cores_x + i * (menu_cor_tamanho + menu_cor_espaco);
+                if (point_in_rectangle(_mouse_x, _mouse_y,
+                    _color_left, menu_cores_y,
+                    _color_left + menu_cor_tamanho, menu_cores_y + menu_cor_tamanho)) {
+                    cor_indice = i;
+                    cor_atual = cores_jogador[i];
+                    break;
+                }
+            }
+            for (var _char_index = 0; _char_index < array_length(sprites_personagens); _char_index++) {
+                var _col = _char_index mod 2;
+                var _row = _char_index div 2;
+                var _char_x = menu_personagens_x + _col * (menu_personagem_botao_largura + menu_personagem_botao_espaco_x);
+                var _char_y = menu_personagens_y + _row * (menu_personagem_botao_altura + menu_personagem_botao_espaco_y);
+                if (point_in_rectangle(_mouse_x, _mouse_y, _char_x, _char_y,
+                    _char_x + menu_personagem_botao_largura,
+                    _char_y + menu_personagem_botao_altura)) {
+                    personagem_indice = _char_index;
+                    personagem_atual = personagens[personagem_indice];
+                    break;
+                }
+            }
+            if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
+                tela_atual = telas.menu;
+                menu_erro = "";
+                menu_mensagem = "";
+            }
+        break;
 
         case telas.menu_partida_privada:
-
-            // Criar partida privada.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                _room_x / 2 - 200,
-                _room_y / 2 - 240,
-                _room_x / 2 + 200,
-                _room_y / 2 - 130
-            )) {
-
+            if (point_in_rectangle(_mouse_x, _mouse_y, 440, 120, 840, 230)) {
                 if (_net != noone) {
-
                     menu_erro = "";
                     menu_mensagem = "Criando partida...";
                     menu_aguardando = true;
-
-                    _net.net_create_private(
-                        nome_jogador,
-                        cor_atual,
-                        personagem_indice
-                    );
+                    _net.net_create_private(nome_jogador, cor_atual, personagem_indice);
                 }
+                break;
             }
-
-            // Ativar campo de código privado.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                _room_x / 2 - 200,
-                _room_y / 2 - 10,
-                _room_x / 2 + 200,
-                _room_y / 2 + 100
-            )) {
-
+            if (point_in_rectangle(_mouse_x, _mouse_y, 440, 350, 840, 460)) {
                 ativo_code = true;
-
                 keyboard_string = code;
                 menu_erro = "";
                 menu_mensagem = "";
+                break;
             }
-
-            // Voltar.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                20, 670, 300, 740
-            )) {
-
-                ativo_code = false;
-                code = "";
-                keyboard_string = "";
-
-                tela_atual = telas.menu;
-
-                menu_erro = "";
-                menu_mensagem = "";
+            if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
+                ativo_code = false; code = ""; keyboard_string = "";
+                tela_atual = telas.menu; menu_erro = ""; menu_mensagem = "";
             }
-
         break;
-
-        // ==========================================
-        // MENU PÚBLICO
-        // ==========================================
 
         case telas.menu_partida_publica:
-
-            // Voltar.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                20, 670, 300, 740
-            )) {
-
-                ativo_code = false;
-                code = "";
-                keyboard_string = "";
-
-                tela_atual = telas.menu;
-
-                menu_erro = "";
-                menu_mensagem = "";
-
+            if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
+                ativo_code = false; code = ""; keyboard_string = "";
+                tela_atual = telas.menu; menu_erro = ""; menu_mensagem = "";
                 break;
             }
-
-            // Ativar campo de código público.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                _room_x / 2 - 450,
-                _room_y / 2 + 90,
-                _room_x / 2 - 50,
-                _room_y / 2 + 160
-            )) {
-
-                ativo_code = true;
-
-                keyboard_string = code;
-                menu_erro = "";
-                menu_mensagem = "";
-
+            if (point_in_rectangle(_mouse_x, _mouse_y, 190, 420, 590, 490)) {
+                ativo_code = true; keyboard_string = code;
+                menu_erro = ""; menu_mensagem = "";
                 break;
             }
-
-            // Procurar partida aleatória.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                _room_x / 2 - 100,
-                670,
-                _room_x / 2 + 100,
-                740
-            )) {
-
+            if (point_in_rectangle(_mouse_x, _mouse_y, 530, 635, 750, 705)) {
                 if (_net != noone) {
-
-                    ativo_code = false;
-                    menu_erro = "";
-                    menu_mensagem = "Procurando partida...";
-                    menu_aguardando = true;
-
-                    _net.net_find_public(
-                        nome_jogador,
-                        cor_atual,
-                        personagem_indice
-                    );
+                    ativo_code = false; menu_erro = "";
+                    menu_mensagem = "Procurando partida..."; menu_aguardando = true;
+                    _net.net_find_public(nome_jogador, cor_atual, personagem_indice);
                 }
-
                 break;
             }
-
-            // Entrar em uma partida pública da lista.
             if (_net != noone) {
-
-                var _visible_index = 0;
-
-                for (var i = 0; i < array_length(_net.net_lobby_rooms); i++) {
-
+                var _visible_count = min(array_length(_net.net_lobby_rooms), 4);
+                for (var i = 0; i < _visible_count; i++) {
                     var _room_info = _net.net_lobby_rooms[i];
-
-                    var _row_top = _room_y / 2 - 90 + (_visible_index * 100);
-                    var _row_bottom = _row_top + 74;
-
-                    if (_visible_index < 4) {
-
-                        if (point_in_rectangle(
-                            mouse_x, mouse_y,
-                            _room_x / 2 + 210,
-                            _row_top,
-                            _room_x - 40,
-                            _row_bottom
-                        )) {
-
-                            menu_erro = "";
-                            menu_mensagem = "Entrando na partida...";
-                            menu_aguardando = true;
-
-                            _net.net_join_public(
-                                _room_info.roomId,
-                                nome_jogador,
-                                cor_atual,
-                                personagem_indice
-                            );
-
-                            break;
-                        }
+                    var _row_top = 180 + i * 100;
+                    if (point_in_rectangle(_mouse_x, _mouse_y, 850, _row_top, 1240, _row_top + 74)) {
+                        menu_erro = ""; menu_mensagem = "Entrando na partida...";
+                        menu_aguardando = true;
+                        _net.net_join_public(_room_info.roomId, nome_jogador, cor_atual, personagem_indice);
+                        break;
                     }
-
-                    _visible_index++;
                 }
             }
-
         break;
 
-        // ==========================================
-        // LOBBY
-        // ==========================================
-
         case telas.lobby:
-
-            // Selecionar uma cor no lobby.
-            if (_net != noone
-            && _net.net_connected
-            && _net.net_game_status == "waiting") {
-
+            if (_net != noone && _net.net_connected && _net.net_game_status == "waiting") {
                 for (var i = 0; i < array_length(cores_jogador); i++) {
-
                     var _color_left = 20 + i * 60;
-                    var _color_right = _color_left + 50;
-
-                    if (point_in_rectangle(
-                        mouse_x, mouse_y,
-                        _color_left, 150,
-                        _color_right, 200
-                    )) {
-
+                    if (point_in_rectangle(_mouse_x, _mouse_y, _color_left, 150, _color_left + 50, 200)) {
                         var _requested_color = cores_jogador[i];
                         var _color_occupied = false;
-
                         for (var j = 0; j < array_length(_net.net_players); j++) {
-
                             var _other_player = _net.net_players[j];
-
                             if (_other_player.session_id != _net.net_session_id) {
-
-                                var _other_color = colyseus_schema_get(
-                                    _other_player.schema,
-                                    "color"
-                                );
-
+                                var _other_color = colyseus_schema_get(_other_player.schema, "color");
                                 if (_other_color == _requested_color) {
                                     _color_occupied = true;
                                     break;
                                 }
                             }
                         }
-
                         if (!_color_occupied) {
-
-                            colyseus_send(
-                                _net.net_room,
-                                "select_color",
-                                {
-                                    color: _requested_color
-                                }
-                            );
-
+                            colyseus_send(_net.net_room, "select_color", { color: _requested_color });
                             menu_erro = "";
                         }
-
                         break;
                     }
                 }
             }
-
-            // Sair do lobby.
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                20, 670, 300, 740
-            )) {
-
+            if (point_in_rectangle(_mouse_x, _mouse_y, 20, 635, 300, 705)) {
                 if (_net != noone && _net.net_connected) {
-
                     if (_net.net_room != 0) {
-
-                        if (colyseus_room_is_connected(_net.net_room)) {
-                            colyseus_room_leave(_net.net_room);
-                        }
-
+                        if (colyseus_room_is_connected(_net.net_room)) colyseus_room_leave(_net.net_room);
                         colyseus_room_free(_net.net_room);
                     }
-
                     _net.net_room = 0;
                     _net.net_callbacks = 0;
-
                     _net.net_connected = false;
                     _net.net_busy = false;
-
                     _net.net_players = [];
-
                     _net.net_room_id = "";
                     _net.net_session_id = "";
                     _net.net_host_session_id = "";
-
                     _net.net_game_status = "waiting";
                     _net.net_game_started = false;
-
                     _net.net_room_mode = "";
                     _net.net_auto_start_countdown = 0;
-
                     _net.net_player_color = "red";
                 }
-
                 tela_atual = telas.menu;
-
                 menu_conexao_anterior = false;
                 menu_aguardando = false;
                 ativo_code = false;
                 code = "";
                 keyboard_string = "";
-
                 codigo_sala_privada = "";
-
                 qtd_players = 0;
-
                 menu_erro = "";
                 menu_mensagem = "";
-
                 break;
             }
-
-            // Iniciar partida privada: somente anfitrião.
-            if (_net != noone
-            && _net.net_connected
-            && _net.net_room_mode == "private"
-            && _net.net_session_id == _net.net_host_session_id
-            && array_length(_net.net_players) >= 2) {
-
-                if (point_in_rectangle(
-                    mouse_x, mouse_y,
-                    _room_x / 2 - 100,
-                    670,
-                    _room_x / 2 + 100,
-                    740
-                )) {
-
-                    colyseus_send(
-                        _net.net_room,
-                        "start",
-                        {}
-                    );
-
+            if (_net != noone && _net.net_connected &&
+                _net.net_room_mode == "private" &&
+                _net.net_session_id == _net.net_host_session_id &&
+                array_length(_net.net_players) >= 2) {
+                if (point_in_rectangle(_mouse_x, _mouse_y, 540, 635, 740, 705)) {
+                    colyseus_send(_net.net_room, "start", {});
                     menu_mensagem = "Iniciando partida...";
                 }
             }
-
         break;
     }
 }
 "
-obj_menu draw:"
-/// obj_menu - Draw
 
-var _room_x = room_width;
-var _room_y = room_height;
+obj_menu draw:"/// obj_menu - Draw
 
-var _b1 = (_room_y / 2) - 100;
-var _b2 = (_room_y / 2) - 25;
-var _b3 = (_room_x / 2) - 450;
+var _room_x = 1280;
+var _room_y = 720;
+var _mx = mouse_x;
+var _my = mouse_y;
+var _net = instance_find(obj_network_manager, 0);
 
-// Restaurar estados de desenho.
 draw_set_alpha(1);
 draw_set_color(c_white);
 draw_set_halign(fa_left);
 draw_set_valign(fa_top);
-
-// --------------------------------------------------
-// TELAS
-// --------------------------------------------------
 
 switch (tela_atual) {
 
     // ==============================================
     // MENU PRINCIPAL
     // ==============================================
-
     case telas.menu:
 
-        // ------------------------------------------
-        // FOTO DE PERFIL DA STEAM
-        // ------------------------------------------
+        // --------------------------------------------------
+        // BARRA LATERAL ANIMADA - PIVOT TOP LEFT
+        // --------------------------------------------------
+        // Na posicao fechada, fica 2 px mais a esquerda
+        // do que antes (nenhum pixel aparece na tela).
+        // Na posicao aberta, termina exatamente em X=0.
+        var _barra_lateral_x = menu_lateral_abertura - 274 +
+            2 * (menu_lateral_abertura / 272);
 
-        var _avatar_x = menu_perfil_x;
-        var _avatar_y = menu_perfil_y;
-        var _avatar_tamanho = menu_perfil_tamanho;
+        draw_set_color(c_white);
+        draw_sprite(spr_barra_lateral, 0, _barra_lateral_x, 0);
 
-        // Fundo enquanto a imagem carrega.
+        // --------------------------------------------------
+        // FOTO DE PERFIL STEAM - MANTIDA
+        // --------------------------------------------------
         draw_set_color(c_black);
-
         draw_rectangle(
-            _avatar_x,
-            _avatar_y,
-            _avatar_x + _avatar_tamanho,
-            _avatar_y + _avatar_tamanho,
+            menu_perfil_x, menu_perfil_y,
+            menu_perfil_x + menu_perfil_tamanho,
+            menu_perfil_y + menu_perfil_tamanho,
             false
         );
-
         draw_set_color(c_white);
-
-        // Desenhar foto carregada.
-        if (menu_avatar_carregado) {
-
+        if (menu_avatar_carregado && menu_avatar_sprite != -1) {
             if (sprite_exists(menu_avatar_sprite)) {
-
-                var _sprite_w = sprite_get_width(menu_avatar_sprite);
-                var _sprite_h = sprite_get_height(menu_avatar_sprite);
-
-                var _scale_x = _avatar_tamanho / _sprite_w;
-                var _scale_y = _avatar_tamanho / _sprite_h;
-				 gpu_set_texfilter(true);
+                var _avatar_w = sprite_get_width(menu_avatar_sprite);
+                var _avatar_h = sprite_get_height(menu_avatar_sprite);
+                gpu_set_texfilter(true);
                 draw_sprite_ext(
-                    menu_avatar_sprite,
-                    0,
-                    _avatar_x,
-                    _avatar_y,
-                    _scale_x,
-                    _scale_y,
-                    0,
-                    c_white,
-                    1
+                    menu_avatar_sprite, 0,
+                    menu_perfil_x, menu_perfil_y,
+                    menu_perfil_tamanho / _avatar_w,
+                    menu_perfil_tamanho / _avatar_h,
+                    0, c_white, 1
                 );
-				 gpu_set_texfilter(false);
+                gpu_set_texfilter(false);
             }
         }
-
-        // Borda branca por cima da foto.
-        draw_set_color(c_white);
-        draw_set_alpha(1);
-
         draw_rectangle(
-            _avatar_x,
-            _avatar_y,
-            _avatar_x + _avatar_tamanho,
-            _avatar_y + _avatar_tamanho,
+            menu_perfil_x, menu_perfil_y,
+            menu_perfil_x + menu_perfil_tamanho,
+            menu_perfil_y + menu_perfil_tamanho,
             true
         );
 
-        // ------------------------------------------
-        // NOME DO JOGADOR
-        // ------------------------------------------
-
+        // --------------------------------------------------
+        // NOME DO JOGADOR STEAM - MANTIDO
+        // --------------------------------------------------
         draw_set_color(c_white);
-        draw_set_halign(fa_left);
+        draw_text_transformed(menu_nome_x, menu_nome_y, nome_jogador, 1, 1, 0);
 
-        draw_text_transformed(
-            menu_nome_x,
-            menu_nome_y,
-            nome_jogador,
-            1,
-            1,
-            0
-        );
+        // --------------------------------------------------
+        // CONTEUDO DECORATIVO DA LATERAL
+        // SOMENTE QUANDO A BARRA ESTA ATIVA E ABERTA
+        // --------------------------------------------------
+        if (menu_lateral_ativa && menu_lateral_abertura >= 270) {
+            var _painel_x = _barra_lateral_x;
+            var _painel_mouse_x = _mx - _painel_x;
 
-        // ------------------------------------------
-        // SELEÇÃO DE CORES
-        // ------------------------------------------
+            draw_set_font(fnt_pixelari);
+            draw_set_color(c_white);
+            draw_set_halign(fa_left);
+            draw_set_valign(fa_top);
 
-        for (var i = 0; i < array_length(cores_jogador); i++) {
-
-            var _color_left =
-                menu_cores_x +
-                i * (menu_cor_tamanho + menu_cor_espaco);
-
-            var _color_top = menu_cores_y;
-            var _color_right = _color_left + menu_cor_tamanho;
-            var _color_bottom = _color_top + menu_cor_tamanho;
-
-            draw_set_alpha(1);
-            draw_set_color(cores_draw[i]);
-
-            draw_rectangle(
-                _color_left,
-                _color_top,
-                _color_right,
-                _color_bottom,
-                false
+            // Convite de amigos - titulo igual a referencia.
+            draw_text_transformed(
+                _painel_x + 19, 168,
+                "Convidar Amigos", 0.1, 0.1, 0
             );
 
-            // Escurecer a cor selecionada.
-            if (i == cor_indice) {
-
-                draw_set_color(c_black);
-                draw_set_alpha(0.8);
-
-                draw_rectangle(
-                    _color_left,
-                    _color_top,
-                    _color_right,
-                    _color_bottom,
-                    false
+            // Tres botoes de convite (apenas visual / hover).
+            for (var _convite_i = 0; _convite_i < 3; _convite_i++) {
+                var _convite_x = _painel_x + 23 + _convite_i * 32;
+                var _convite_y = 187;
+                var _convite_w = sprite_get_width(spr_invitefriend_button);
+                var _convite_h = sprite_get_height(spr_invitefriend_button);
+                var _convite_hover = point_in_rectangle(
+                    _mx, _my, _convite_x, _convite_y,
+                    _convite_x + _convite_w, _convite_y + _convite_h
+                );
+                draw_sprite(
+                    spr_invitefriend_button,
+                    _convite_hover ? 1 : 0,
+                    _convite_x, _convite_y
                 );
             }
 
-            draw_set_alpha(1);
+            // Codigo de amigo: sem um codigo real definido ainda.
+            draw_text_transformed(
+                _painel_x + 7, 259,
+                "Codigo de amigo:", 0.1, 0.1, 0
+            );
+
+            // Botao de adicionar amigo (apenas visual / hover).
+            var _add_x = _painel_x + 7;
+            var _add_y = 290;
+            var _add_w = sprite_get_width(spr_addfriend_button);
+            var _add_h = sprite_get_height(spr_addfriend_button);
+            var _add_hover = point_in_rectangle(
+                _mx, _my, _add_x, _add_y,
+                _add_x + _add_w, _add_y + _add_h
+            );
+            draw_sprite(
+                spr_addfriend_button, _add_hover ? 1 : 0,
+                _add_x, _add_y
+            );
+            // Texto sobre o botao, como no modelo.
             draw_set_color(c_white);
+            draw_set_halign(fa_left);
+            draw_set_valign(fa_middle);
+            draw_text_transformed(
+                _add_x + 12, _add_y + _add_h / 2,
+                "Adicionar amigo...", 0.1, 0.1, 0
+            );
+            draw_set_valign(fa_top);
+
+            // Lista de amigos - vazia ate a integracao.
+            draw_set_halign(fa_center);
+            draw_text_transformed(
+                _painel_x + 136.5, 348,
+                "Lista de Amigos", 0.1, 0.1, 0
+            );
+            draw_set_halign(fa_left);
+
+            // Trilho da scrollbar no canto esquerdo da lista.
+            var _scroll_x = _painel_x + 7;
+            var _scroll_y = 383;
+            var _scroll_altura = sprite_get_height(spr_scroll_bar);
+            var _scroll_botao_altura = sprite_get_height(spr_scroll_bar_button);
+            var _trilho_altura = min(_scroll_altura, 720 - _scroll_y - 8);
+            var _scroll_escala_y = _trilho_altura / max(1, _scroll_altura);
+
+            // O trilho fica inteiro dentro da tela de 720 pixels.
+            draw_sprite_ext(
+                spr_scroll_bar, 0, _scroll_x, _scroll_y,
+                1, _scroll_escala_y, 0, c_white, 1
+            );
+
+            // Bolinha da scrollbar - arraste e roda do mouse.
+            var _percurso = max(0, _trilho_altura - _scroll_botao_altura);
+            var _bolinha_y = _scroll_y + menu_amigos_scroll * _percurso;
+            draw_sprite(spr_scroll_bar_button, 0, _scroll_x, _bolinha_y);
+
+            draw_set_font(-1);
         }
 
-        // ------------------------------------------
-        // BOTÃO DE TROCAR PERSONAGEM
-        // ------------------------------------------
+        // --------------------------------------------------
+        // BOTOES PRINCIPAIS - MOVIMENTO ORIGINAL
+        // --------------------------------------------------
+        for (var i = 0; i < array_length(botoes_menu); i++) {
+            var _left = menu_botoes_x + menu_botoes_deslocamento +
+                i * (menu_botoes_largura + menu_botoes_espaco);
+            var _top = menu_botoes_y;
+            var _right = _left + menu_botoes_largura;
+            var _bottom = _top + menu_botoes_altura;
 
-        var _personagem_left = menu_personagem_x;
-        var _personagem_top = menu_personagem_y;
-
-        var _personagem_right =
-            _personagem_left + menu_personagem_largura;
-
-        var _personagem_bottom =
-            _personagem_top + menu_personagem_altura;
-
-        if (point_in_rectangle(
-            mouse_x,
-            mouse_y,
-            _personagem_left,
-            _personagem_top,
-            _personagem_right,
-            _personagem_bottom
-        )) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(
-            _personagem_left,
-            _personagem_top,
-            _personagem_right,
-            _personagem_bottom,
-            true
-        );
-
-        draw_set_color(c_white);
-
-        // Desenhar personagem selecionado.
-        var _personagem_sprite =
-            sprites_personagens[personagem_indice];
-
-        var _personagem_sprite_w =
-            sprite_get_width(_personagem_sprite);
-
-        var _personagem_sprite_h =
-            sprite_get_height(_personagem_sprite);
-
-        var _personagem_scale = min(
-            menu_personagem_largura / _personagem_sprite_w,
-            menu_personagem_altura / _personagem_sprite_h
-        );
-
-        draw_sprite_ext(
-            _personagem_sprite,
-            0,
-            _personagem_left +
-                (menu_personagem_largura - _personagem_sprite_w * _personagem_scale) / 2,
-            _personagem_top +
-                (menu_personagem_altura - _personagem_sprite_h * _personagem_scale) / 2,
-            _personagem_scale,
-            _personagem_scale,
-            0,
-            c_white,
-            1
-        );
-
-        // ------------------------------------------
-        // BOTÕES PRINCIPAIS
-        // ------------------------------------------
-
-        for (var i = 0; i < 2; i++) {
-
-            var _left = _b3 + i * 300;
-            var _right = _left + 250;
-
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                _left, _b1,
-                _right, _b2
-            )) {
+            draw_set_color(c_white);
+            if (point_in_rectangle(_mx, _my, _left, _top, _right, _bottom)) {
                 draw_set_color(c_lime);
             }
-
-            draw_rectangle(
-                _left, _b1,
-                _right, _b2,
-                true
-            );
-
-            draw_set_halign(fa_center);
-
-            draw_text_transformed(
-                _left + 125,
-                _b1 + 25,
-                botoes_menu[i],
-                1, 1, 0
-            );
-
-            draw_set_halign(fa_left);
+            draw_rectangle(_left, _top, _right, _bottom, true);
             draw_set_color(c_white);
+            draw_set_halign(fa_center);
+            draw_set_valign(fa_middle);
+            draw_text_transformed(
+                _left + menu_botoes_largura / 2,
+                _top + menu_botoes_altura / 2,
+                botoes_menu[i], 1, 1, 0
+            );
+            draw_set_halign(fa_left);
+            draw_set_valign(fa_top);
+        }
+    break;
+
+    // ==============================================
+    // CUSTOMIZACAO
+    // ==============================================
+    case telas.customizacao:
+        draw_set_color(c_white);
+        draw_set_halign(fa_center);
+        draw_text_transformed(640, 35, "Customizacao", 2, 2, 0);
+        draw_set_halign(fa_left);
+
+        draw_set_color(c_white);
+        draw_text_transformed(menu_cores_x, menu_cores_y - 42, "Escolha sua cor:", 1, 1, 0);
+        for (var i = 0; i < array_length(cores_jogador); i++) {
+            var _color_x = menu_cores_x + i * (menu_cor_tamanho + menu_cor_espaco);
+            draw_set_color(cores_draw[i]);
+            draw_rectangle(_color_x, menu_cores_y,
+                _color_x + menu_cor_tamanho,
+                menu_cores_y + menu_cor_tamanho, false);
+            if (i == cor_indice) {
+                draw_set_color(c_white);
+                draw_rectangle(_color_x - 2, menu_cores_y - 2,
+                    _color_x + menu_cor_tamanho + 2,
+                    menu_cores_y + menu_cor_tamanho + 2, true);
+            }
         }
 
+        draw_set_color(c_white);
+        draw_text_transformed(menu_personagens_titulo_x,
+            menu_personagens_titulo_y - 42, "Escolha seu personagem:", 1, 1, 0);
+
+        for (var _char_index = 0; _char_index < array_length(sprites_personagens); _char_index++) {
+            var _col = _char_index mod 2;
+            var _row = _char_index div 2;
+            var _botao_x = menu_personagens_x + _col *
+                (menu_personagem_botao_largura + menu_personagem_botao_espaco_x);
+            var _botao_y = menu_personagens_y + _row *
+                (menu_personagem_botao_altura + menu_personagem_botao_espaco_y);
+            var _botao_x2 = _botao_x + menu_personagem_botao_largura;
+            var _botao_y2 = _botao_y + menu_personagem_botao_altura;
+            var _selecionado = (_char_index == personagem_indice);
+
+            draw_set_color(c_white);
+            if (point_in_rectangle(_mx, _my, _botao_x, _botao_y, _botao_x2, _botao_y2)) {
+                draw_set_color(c_lime);
+            }
+            draw_rectangle(_botao_x, _botao_y, _botao_x2, _botao_y2, true);
+            if (_selecionado) {
+                draw_set_color(c_yellow);
+                draw_rectangle(_botao_x - 3, _botao_y - 3,
+                    _botao_x2 + 3, _botao_y2 + 3, true);
+            }
+
+            var _spr = sprites_personagens[_char_index];
+            var _spr_w = sprite_get_width(_spr);
+            var _spr_h = sprite_get_height(_spr);
+            var _spr_origin_x = sprite_get_xoffset(_spr);
+            var _spr_origin_y = sprite_get_yoffset(_spr);
+            var _escala = min(
+                (menu_personagem_botao_largura * 0.70) / _spr_w,
+                (menu_personagem_botao_altura * 0.70) / _spr_h
+            );
+            var _centro_x = _botao_x + menu_personagem_botao_largura / 2;
+            var _centro_y = _botao_y + menu_personagem_botao_altura / 2;
+            var _draw_x = _centro_x + (_spr_origin_x - _spr_w / 2) * _escala;
+            var _draw_y = _centro_y + (_spr_origin_y - _spr_h / 2) * _escala;
+            draw_set_color(c_white);
+            draw_sprite_ext(_spr, 0, _draw_x, _draw_y,
+                _escala, _escala, 0, c_white, 1);
+        }
+        draw_set_color(c_white);
+        draw_text_transformed(menu_personagens_x,
+            menu_personagens_y + menu_personagem_botao_altura * 2 +
+            menu_personagem_botao_espaco_y + 20,
+            "Personagem " + string(personagem_indice + 1) + " / " +
+            string(array_length(personagens)), 1, 1, 0);
+
+        draw_set_color(c_white);
+        if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
+        draw_rectangle(20, 635, 300, 705, true);
+        draw_set_color(c_white);
+        draw_text_transformed(30, 655, "Voltar", 1, 1, 0);
     break;
 
     // ==============================================
     // MENU PRIVADO
     // ==============================================
-
     case telas.menu_partida_privada:
-
-        // Criar partida.
-        if (point_in_rectangle(
-            mouse_x, mouse_y,
-            _room_x / 2 - 200,
-            _room_y / 2 - 240,
-            _room_x / 2 + 200,
-            _room_y / 2 - 130
-        )) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(
-            _room_x / 2 - 200,
-            _room_y / 2 - 240,
-            _room_x / 2 + 200,
-            _room_y / 2 - 130,
-            true
-        );
-
+        draw_set_color(c_white);
+        if (point_in_rectangle(_mx, _my, 440, 120, 840, 230)) draw_set_color(c_lime);
+        draw_rectangle(440, 120, 840, 230, true);
         draw_set_halign(fa_center);
-
-        draw_text_transformed(
-            _room_x / 2,
-            _room_y / 2 - 200,
-            "Criar Partida",
-            2, 2, 0
-        );
+        draw_text_transformed(640, 160, "Criar Partida", 2, 2, 0);
 
         draw_set_color(c_white);
-        draw_set_halign(fa_left);
-
-        // Título do campo.
-        draw_set_halign(fa_center);
-
-        draw_text_transformed(
-            _room_x / 2,
-            _room_y / 2 - 80,
-            "Digite o codigo",
-            2, 2, 0
-        );
-
-        draw_set_halign(fa_left);
-
-        // Campo de código.
-        if (ativo_code) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(
-            _room_x / 2 - 200,
-            _room_y / 2 - 10,
-            _room_x / 2 + 200,
-            _room_y / 2 + 100,
-            true
-        );
-
+        draw_text_transformed(640, 305, "Digite o codigo", 2, 2, 0);
+        if (ativo_code) draw_set_color(c_lime);
+        draw_rectangle(440, 350, 840, 460, true);
         draw_set_color(c_white);
-
         if (code == "") {
-
             draw_set_alpha(0.5);
-
-            draw_text_transformed(
-                _room_x / 2 - 90,
-                _room_y / 2 + 10,
-                "Codigo da sala...",
-                2, 2, 0
-            );
-
+            draw_text_transformed(640, 390, "Codigo da sala...", 2, 2, 0);
             draw_set_alpha(1);
-
         } else {
-
-            draw_text_transformed(
-                _room_x / 2 - 90,
-                _room_y / 2 + 10,
-                code,
-                2, 2, 0
-            );
+            draw_text_transformed(640, 390, code, 2, 2, 0);
         }
-
-        // Voltar.
-        if (point_in_rectangle(
-            mouse_x, mouse_y,
-            20, 670, 300, 740
-        )) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(20, 670, 300, 740, true);
-        draw_text_transformed(30, 690, "Voltar", 1, 1, 0);
-
+        draw_set_halign(fa_left);
         draw_set_color(c_white);
-
+        if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
+        draw_rectangle(20, 635, 300, 705, true);
+        draw_set_color(c_white);
+        draw_text_transformed(30, 655, "Voltar", 1, 1, 0);
     break;
 
     // ==============================================
-    // MENU PÚBLICO
+    // MENU PUBLICO
     // ==============================================
-
     case telas.menu_partida_publica:
-
-        // Voltar.
-        if (point_in_rectangle(
-            mouse_x, mouse_y,
-            20, 670, 300, 740
-        )) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(20, 670, 300, 740, true);
-        draw_text_transformed(30, 690, "Voltar", 1, 1, 0);
+        draw_set_color(c_white);
+        if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
+        draw_rectangle(20, 635, 300, 705, true);
+        draw_set_color(c_white);
+        draw_text_transformed(30, 655, "Voltar", 1, 1, 0);
 
         draw_set_color(c_white);
-
-        // Procurar partida.
-        if (point_in_rectangle(
-            mouse_x, mouse_y,
-            _room_x / 2 - 100,
-            670,
-            _room_x / 2 + 100,
-            740
-        )) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(
-            _room_x / 2 - 100,
-            670,
-            _room_x / 2 + 100,
-            740,
-            true
-        );
-
+        if (point_in_rectangle(_mx, _my, 530, 635, 750, 705)) draw_set_color(c_lime);
+        draw_rectangle(530, 635, 750, 705, true);
         draw_set_halign(fa_center);
-
-        draw_text_transformed(
-            _room_x / 2,
-            690,
-            "Procurar Partida",
-            1, 1, 0
-        );
-
-        draw_set_halign(fa_left);
         draw_set_color(c_white);
-
-        // Entrar por código.
-        draw_set_halign(fa_center);
-
-        draw_text_transformed(
-            _room_x / 2 - 250,
-            _room_y / 2 + 45,
-            "Entrar por codigo",
-            1, 1, 0
-        );
-
-        draw_set_halign(fa_left);
-
-        if (ativo_code) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(
-            _room_x / 2 - 450,
-            _room_y / 2 + 90,
-            _room_x / 2 - 50,
-            _room_y / 2 + 160,
-            true
-        );
-
+        draw_text_transformed(640, 655, "Procurar Partida", 1, 1, 0);
+        draw_text_transformed(390, 375, "Entrar por codigo", 1, 1, 0);
+        if (ativo_code) draw_set_color(c_lime);
+        draw_rectangle(190, 420, 590, 490, true);
         draw_set_color(c_white);
-
         if (code == "") {
-
             draw_set_alpha(0.5);
-
-            draw_text_transformed(
-                _room_x / 2 - 430,
-                _room_y / 2 + 110,
-                "Codigo da sala...",
-                1, 1, 0
-            );
-
+            draw_text_transformed(390, 443, "Codigo da sala...", 1, 1, 0);
             draw_set_alpha(1);
-
         } else {
-
-            draw_text_transformed(
-                _room_x / 2 - 430,
-                _room_y / 2 + 110,
-                code,
-                1, 1, 0
-            );
+            draw_text_transformed(390, 443, code, 1, 1, 0);
         }
-
-        // Lista de partidas.
-        draw_set_halign(fa_center);
-
-        draw_text_transformed(
-            _room_x / 2 + 400,
-            _room_y / 2 - 130,
-            "Partidas Encontradas",
-            1, 1, 0
-        );
-
-        draw_set_halign(fa_left);
-
-        draw_rectangle(
-            _room_x / 2 + 200,
-            _room_y / 2 - 100,
-            _room_x - 30,
-            _room_y - 100,
-            true
-        );
-
-        var _net = instance_find(obj_network_manager, 0);
-
+        draw_text_transformed(1045, 115, "Partidas Encontradas", 1, 1, 0);
+        draw_rectangle(840, 165, 1250, 580, true);
         if (_net != noone) {
-
-            var _room_count = array_length(_net.net_lobby_rooms);
-            var _visible_count = min(_room_count, 4);
-
+            var _visible_count = min(array_length(_net.net_lobby_rooms), 4);
             for (var i = 0; i < _visible_count; i++) {
-
                 var _room_info = _net.net_lobby_rooms[i];
-
-                var _row_top = _room_y / 2 - 90 + i * 100;
-                var _row_bottom = _row_top + 74;
-
-                if (point_in_rectangle(
-                    mouse_x, mouse_y,
-                    _room_x / 2 + 210,
-                    _row_top,
-                    _room_x - 40,
-                    _row_bottom
-                )) {
+                var _row_top = 180 + i * 100;
+                draw_set_color(c_white);
+                if (point_in_rectangle(_mx, _my, 850, _row_top, 1240, _row_top + 74)) {
                     draw_set_color(c_lime);
                 }
-
-                draw_rectangle(
-                    _room_x / 2 + 210,
-                    _row_top,
-                    _room_x - 40,
-                    _row_bottom,
-                    true
-                );
-
+                draw_rectangle(850, _row_top, 1240, _row_top + 74, true);
                 draw_set_color(c_white);
-
-                draw_text_transformed(
-                    _room_x / 2 + 225,
-                    _row_top + 8,
-                    "Sala: " + _room_info.roomId,
-                    1, 1, 0
-                );
-
-                draw_text_transformed(
-                    _room_x / 2 + 225,
-                    _row_top + 40,
+                draw_set_halign(fa_left);
+                draw_text_transformed(865, _row_top + 8,
+                    "Sala: " + _room_info.roomId, 1, 1, 0);
+                draw_text_transformed(865, _row_top + 40,
                     string(_room_info.clients) + " / " +
-                    string(_room_info.maxClients) + " jogadores",
-                    1, 1, 0
-                );
-
+                    string(_room_info.maxClients) + " jogadores", 1, 1, 0);
                 for (var j = 0; j < 4; j++) {
-
                     var _has_player = j < _room_info.clients;
-
-                    draw_sprite_ext(
-                        spr_players_icon,
-                        _has_player,
-                        _room_x - 150 + j * 25,
-                        _row_top + 25,
-                        2, 2, 0,
-                        c_white, 1
-                    );
+                    draw_sprite_ext(spr_players_icon, _has_player,
+                        1100 + j * 25, _row_top + 42, 1, 1, 0, c_white, 1);
                 }
             }
-
-            if (_room_count == 0) {
-
-                draw_set_halign(fa_center);
-
-                draw_text_transformed(
-                    _room_x / 2 + 400,
-                    _room_y / 2 + 50,
-                    "Nenhuma partida encontrada",
-                    1, 1, 0
-                );
-
-                draw_set_halign(fa_left);
-            }
         }
-
     break;
-
 
     // ==============================================
     // LOBBY
     // ==============================================
-
     case telas.lobby:
-
-        var _net = instance_find(obj_network_manager, 0);
-
+        draw_set_color(c_white);
         draw_set_halign(fa_center);
-
-        // ------------------------------------------
-        // INFORMAÇÕES NO TOPO DA TELA
-        // ------------------------------------------
-
-        draw_text_transformed(
-            _room_x / 2,
-            20,
-            "Lobby",
-            2, 2, 0
-        );
-
-        draw_text_transformed(
-            _room_x / 2,
-            75,
-            "Codigo da sala: " + codigo_sala_privada,
-            1, 1, 0
-        );
-
-        draw_text_transformed(
-            _room_x / 2,
-            110,
-            "Jogadores: " + string(qtd_players) + " / 4",
-            1, 1, 0
-        );
-
+        draw_text_transformed(640, 20, "Lobby", 2, 2, 0);
+        draw_text_transformed(640, 75,
+            "Codigo da sala: " + codigo_sala_privada, 1, 1, 0);
+        draw_text_transformed(640, 110,
+            "Jogadores: " + string(qtd_players) + " / 4", 1, 1, 0);
         draw_set_halign(fa_left);
-
-        // ------------------------------------------
-        // SELEÇÃO DE CORES DO LOBBY
-        // ------------------------------------------
-
-        draw_text_transformed(
-            20,
-            125,
-            "Escolha sua cor:",
-            1, 1, 0
-        );
-
+        draw_text_transformed(20, 125, "Escolha sua cor:", 1, 1, 0);
         for (var i = 0; i < array_length(cores_jogador); i++) {
-
             var _color_left = 20 + i * 60;
             var _color_top = 150;
             var _color_right = _color_left + 50;
-            var _color_bottom = _color_top + 50;
-
+            var _color_bottom = 200;
             var _color_occupied = false;
-
             if (_net != noone) {
-
                 for (var j = 0; j < array_length(_net.net_players); j++) {
-
                     var _player_color = colyseus_schema_get(
-                        _net.net_players[j].schema,
-                        "color"
-                    );
-
+                        _net.net_players[j].schema, "color");
                     if (_player_color == cores_jogador[i]) {
                         _color_occupied = true;
                         break;
                     }
                 }
             }
-
             draw_set_alpha(1);
             draw_set_color(cores_draw[i]);
-
-            draw_rectangle(
-                _color_left,
-                _color_top,
-                _color_right,
-                _color_bottom,
-                false
-            );
-
+            draw_rectangle(_color_left, _color_top, _color_right, _color_bottom, false);
             if (_color_occupied) {
-
                 draw_set_color(c_black);
                 draw_set_alpha(0.8);
-
-                draw_rectangle(
-                    _color_left,
-                    _color_top,
-                    _color_right,
-                    _color_bottom,
-                    false
-                );
+                draw_rectangle(_color_left, _color_top, _color_right, _color_bottom, false);
             }
-
-            draw_set_alpha(1);
         }
-
+        draw_set_alpha(1);
         draw_set_color(c_white);
-
-        // ------------------------------------------
-        // CAIXAS DOS JOGADORES
-        // ------------------------------------------
-
         var _player_x = -250;
-
         for (var i = 0; i < 4; i++) {
-
-            var _box_left = _room_x / 2 + _player_x + i * 140;
+            var _box_left = 640 + _player_x + i * 140;
             var _box_right = _box_left + 100;
-
-            draw_rectangle(
-                _box_left,
-                _room_y / 2,
-                _box_right,
-                _room_y / 2 + 200,
-                true
-            );
-
+            draw_rectangle(_box_left, 360, _box_right, 560, true);
             var _player_name = "Aguardando...";
-
             var _has_player = false;
             var _box_player_color = "";
-
-            if (_net != noone) {
-
-                if (i < array_length(_net.net_players)) {
-
-                    _has_player = true;
-
-                    _player_name = _net.net_players[i].name;
-
-                    _box_player_color = colyseus_schema_get(
-                        _net.net_players[i].schema,
-                        "color"
-                    );
-                }
+            if (_net != noone && i < array_length(_net.net_players)) {
+                _has_player = true;
+                _player_name = _net.net_players[i].name;
+                _box_player_color = colyseus_schema_get(
+                    _net.net_players[i].schema, "color");
             }
-
             if (_has_player) {
-
                 var _box_color = c_red;
-
                 switch (_box_player_color) {
-
-                    case "red":
-                        _box_color = c_red;
-                    break;
-
-                    case "blue":
-                        _box_color = c_blue;
-                    break;
-
-                    case "green":
-                        _box_color = c_green;
-                    break;
-
-                    case "yellow":
-                        _box_color = c_yellow;
-                    break;
+                    case "red": _box_color = c_red; break;
+                    case "blue": _box_color = c_blue; break;
+                    case "green": _box_color = c_green; break;
+                    case "yellow": _box_color = c_yellow; break;
                 }
-
-                draw_set_alpha(1);
                 draw_set_color(_box_color);
-
-                draw_rectangle(
-                    _box_left,
-                    _room_y / 2,
-                    _box_right,
-                    _room_y / 2 + 12,
-                    false
-                );
+                draw_rectangle(_box_left, 360, _box_right, 372, false);
             }
-
-            draw_set_alpha(1);
             draw_set_color(c_white);
             draw_set_halign(fa_center);
-
-            draw_text_transformed(
-                _box_left + 50,
-                _room_y / 2 + 75,
-                _player_name,
-                1, 1, 0
-            );
-
+            draw_text_transformed(_box_left + 50, 435, _player_name, 1, 1, 0);
             draw_set_halign(fa_left);
         }
-
-        // ------------------------------------------
-        // CONTAGEM AUTOMÁTICA
-        // ------------------------------------------
-
-        if (_net != noone
-        && _net.net_connected
-        && _net.net_room_mode == "public") {
-
-            draw_set_halign(fa_center);
-
-            if (_net.net_auto_start_countdown > 0) {
-
-                draw_text_transformed(
-                    _room_x / 2,
-                    620,
-                    "Partida iniciando em: " +
-                    string(_net.net_auto_start_countdown) + "s",
-                    1.5, 1.5, 0
-                );
-
-            }
-            else if (array_length(_net.net_players) < 2) {
-
-                draw_text_transformed(
-                    _room_x / 2,
-                    620,
-                    "Aguardando mais jogadores...",
-                    1.5, 1.5, 0
-                );
-            }
-
-            draw_set_halign(fa_left);
-        }
-
-        // ------------------------------------------
-        // BOTÃO SAIR DO LOBBY
-        // ------------------------------------------
-
-        if (point_in_rectangle(
-            mouse_x, mouse_y,
-            20, 670, 300, 740
-        )) {
-            draw_set_color(c_lime);
-        }
-
-        draw_rectangle(20, 670, 300, 740, true);
-
-        draw_set_halign(fa_center);
-
-        draw_text_transformed(
-            160,
-            690,
-            "Sair do lobby",
-            1, 1, 0
-        );
-
-        draw_set_halign(fa_left);
         draw_set_color(c_white);
-
-        // ------------------------------------------
-        // BOTÃO INICIAR PARTIDA PRIVADA
-        // ------------------------------------------
-
-        if (_net != noone
-        && _net.net_connected
-        && _net.net_room_mode == "private"
-        && _net.net_session_id == _net.net_host_session_id
-        && array_length(_net.net_players) >= 2) {
-
-            if (point_in_rectangle(
-                mouse_x, mouse_y,
-                _room_x / 2 - 100,
-                670,
-                _room_x / 2 + 100,
-                740
-            )) {
+        if (point_in_rectangle(_mx, _my, 20, 635, 300, 705)) draw_set_color(c_lime);
+        draw_rectangle(20, 635, 300, 705, true);
+        draw_set_color(c_white);
+        draw_set_halign(fa_center);
+        draw_text_transformed(160, 655, "Sair do lobby", 1, 1, 0);
+        if (_net != noone && _net.net_connected &&
+            _net.net_room_mode == "private" &&
+            _net.net_session_id == _net.net_host_session_id &&
+            array_length(_net.net_players) >= 2) {
+            draw_set_color(c_white);
+            if (point_in_rectangle(_mx, _my, 540, 635, 740, 705)) {
                 draw_set_color(c_lime);
             }
-
-            draw_rectangle(
-                _room_x / 2 - 100,
-                670,
-                _room_x / 2 + 100,
-                740,
-                true
-            );
-
-            draw_set_halign(fa_center);
-
-            draw_text_transformed(
-                _room_x / 2,
-                690,
-                "Iniciar partida",
-                1, 1, 0
-            );
-
-            draw_set_halign(fa_left);
+            draw_rectangle(540, 635, 740, 705, true);
             draw_set_color(c_white);
+            draw_text_transformed(640, 655, "Iniciar partida", 1, 1, 0);
         }
-
     break;
-
 }
 
 // --------------------------------------------------
-// MENSAGENS
+// MENSAGENS DO MENU
 // --------------------------------------------------
-
 draw_set_alpha(1);
 draw_set_color(c_white);
-
+draw_set_halign(fa_center);
 if (menu_mensagem != "") {
-
-    draw_set_halign(fa_center);
-
-    draw_text_transformed(
-        _room_x / 2,
-        _room_y - 45,
-        menu_mensagem,
-        1, 1, 0
-    );
+    draw_text_transformed(640, 605, menu_mensagem, 1, 1, 0);
 }
-
 if (menu_erro != "") {
-
     draw_set_color(c_red);
-    draw_set_halign(fa_center);
-
-    draw_text_transformed(
-        _room_x / 2,
-        _room_y - 75,
-        menu_erro,
-        1, 1, 0
-    );
+    draw_text_transformed(640, 580, menu_erro, 1, 1, 0);
 }
 
+// --------------------------------------------------
+// RESTAURAR CONFIGURACOES
+// --------------------------------------------------
 draw_set_alpha(1);
 draw_set_color(c_white);
 draw_set_halign(fa_left);
-"
-obj_menu clean up:"/// obj_menu - Clean Up
-
-if (menu_avatar_sprite != -1) {
-
-    if (sprite_exists(menu_avatar_sprite)) {
-        sprite_delete(menu_avatar_sprite);
-    }
-
-    menu_avatar_sprite = -1;
-}
-
-menu_avatar_carregado = false;
+draw_set_valign(fa_top);
+draw_set_font(-1);
 "
