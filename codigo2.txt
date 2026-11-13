@@ -587,69 +587,7 @@ for (var _arg = 1; _arg <= parameter_count(); _arg++) {
     }
 }
 "
-obj_menu clean up:"
-/// obj_menu - Clean Up
-
-// --------------------------------------------------
-// LIMPAR CALLBACK DE CONVITES STEAM
-// --------------------------------------------------
-
-if (menu_amigos_convite_callback_registrado) {
-
-    steam_friends_clear_callback_game_rich_presence_join_requested();
-
-    menu_amigos_convite_callback_registrado = false;
-}
-
-// --------------------------------------------------
-// LIBERAR SPRITES DOS AMIGOS
-// --------------------------------------------------
-
-for (
-    var _i = 0;
-    _i < array_length(menu_amigos);
-    _i++
-) {
-
-    var _spr = menu_amigos[_i].sprite;
-
-    if (
-        _spr != -1 &&
-        sprite_exists(_spr)
-    ) {
-        sprite_delete(_spr);
-    }
-}
-
-menu_amigos = [];
-menu_amigos_filtrados = [];
-
-// --------------------------------------------------
-// LIBERAR SURFACE DA LISTA
-// --------------------------------------------------
-
-if (surface_exists(menu_amigos_lista_surface)) {
-
-    surface_free(menu_amigos_lista_surface);
-}
-
-menu_amigos_lista_surface = -1;
-
-// --------------------------------------------------
-// LIBERAR AVATAR DO PROPRIO JOGADOR
-// --------------------------------------------------
-
-if (
-    menu_avatar_sprite != -1 &&
-    sprite_exists(menu_avatar_sprite)
-) {
-
-    sprite_delete(menu_avatar_sprite);
-}
-
-menu_avatar_sprite = -1;
-"
-obJ_menu step:"
+obj_menu step:"
 /// obj_menu - Step
 
 var _net = instance_find(obj_network_manager, 0);
@@ -3233,6 +3171,68 @@ draw_set_color(c_white);
 draw_set_halign(fa_left);
 draw_set_valign(fa_top);
 draw_set_font(-1);
+"
+obj_menu clean up:"
+/// obj_menu - Clean Up
+
+// --------------------------------------------------
+// LIMPAR CALLBACK DE CONVITES STEAM
+// --------------------------------------------------
+
+if (menu_amigos_convite_callback_registrado) {
+
+    steam_friends_clear_callback_game_rich_presence_join_requested();
+
+    menu_amigos_convite_callback_registrado = false;
+}
+
+// --------------------------------------------------
+// LIBERAR SPRITES DOS AMIGOS
+// --------------------------------------------------
+
+for (
+    var _i = 0;
+    _i < array_length(menu_amigos);
+    _i++
+) {
+
+    var _spr = menu_amigos[_i].sprite;
+
+    if (
+        _spr != -1 &&
+        sprite_exists(_spr)
+    ) {
+        sprite_delete(_spr);
+    }
+}
+
+menu_amigos = [];
+menu_amigos_filtrados = [];
+
+// --------------------------------------------------
+// LIBERAR SURFACE DA LISTA
+// --------------------------------------------------
+
+if (surface_exists(menu_amigos_lista_surface)) {
+
+    surface_free(menu_amigos_lista_surface);
+}
+
+menu_amigos_lista_surface = -1;
+
+// --------------------------------------------------
+// LIBERAR AVATAR DO PROPRIO JOGADOR
+// --------------------------------------------------
+
+if (
+    menu_avatar_sprite != -1 &&
+    sprite_exists(menu_avatar_sprite)
+) {
+
+    sprite_delete(menu_avatar_sprite);
+}
+
+menu_avatar_sprite = -1;
 "
 
 obj_network_manager create:"
