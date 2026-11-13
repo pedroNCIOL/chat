@@ -7672,3 +7672,860 @@ export class FriendsRoom extends Room {
     }
 }
 "
+obj_friend_request_popup create:"
+/// obj_friend_request_popup - Create
+
+depth = -10000;
+
+// --------------------------------------------------
+// CONFIGURACOES
+// --------------------------------------------------
+
+popup_duracao = 10;
+popup_velocidade = 0.3;
+popup_maximo = 4;
+
+popup_largura = 340;
+popup_altura = 160;
+
+popup_margem_topo = 12;
+popup_espacamento = 8;
+
+// Os ultimos 32 pixels ficam fora da tela.
+popup_fora_direita = 32;
+
+// --------------------------------------------------
+// LISTAS
+// --------------------------------------------------
+
+// Solicitacoes esperando vaga.
+popup_fila = [];
+
+// Solicitacoes visiveis ou saindo.
+popup_ativos = [];
+
+// Callback que devera ser conectado ao servidor.
+//
+// Recebe:
+// _pedido_id
+// _aceitou
+//
+// O objeto nao grava amizades por conta propria.
+popup_ao_responder = undefined;
+
+// --------------------------------------------------
+// TESTES
+// --------------------------------------------------
+
+// Ative apenas durante o desenvolvimento.
+// Pressione F9 para criar 5 pedidos de teste.
+// O quinto aguardara uma vaga.
+popup_modo_teste = false;
+
+popup_teste_contador = 0;
+
+// --------------------------------------------------
+// RECEBER NOVA SOLICITACAO
+// --------------------------------------------------
+
+// Uso:
+// popup_receber(pedido_id, steam_id, nome, avatar_sprite);
+//
+// avatar_sprite pode ser -1.
+// O sistema tentara obter a foto pela Steam.
+
+popup_receber = function(
+    _pedido_id,
+    _steam_id,
+    _nome,
+    _avatar_sprite
+) {
+
+    // ----------------------------------------------
+    // EVITAR PEDIDOS DUPLICADOS
+    // ----------------------------------------------
+
+    for (var _i = 0; _i < array_length(popup_fila); _i++) {
+
+        if (popup_fila[_i].pedido_id == _pedido_id) {
+            return false;
+        }
+    }
+
+    for (var _i = 0; _i < array_length(popup_ativos); _i++) {
+
+        if (popup_ativos[_i].pedido_id == _pedido_id) {
+            return false;
+        }
+    }
+
+    // ----------------------------------------------
+    // CRIAR PEDIDO
+    // ----------------------------------------------
+
+    var _pedido = {
+        pedido_id: _pedido_id,
+        steam_id: _steam_id,
+        nome: _nome,
+        avatar_sprite: _avatar_sprite,
+        avatar_proprio: false,
+
+        slot: -1,
+
+        pos_x: 0,
+        pos_y: 0,
+
+        estado: "fila",
+
+        tempo_restante: popup_duracao,
+        resposta_enviada: false
+    };
+
+    array_push(popup_fila, _pedido);
+
+    return true;
+};
+
+// --------------------------------------------------
+// VERIFICAR SE UM SLOT ESTA OCUPADO
+// --------------------------------------------------
+
+popup_slot_ocupado = function(_slot) {
+
+    for (var _i = 0; _i < array_length(popup_ativos); _i++) {
+
+        if (popup_ativos[_i].slot == _slot) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+// --------------------------------------------------
+// CARREGAR AVATAR DE UM PEDIDO
+// --------------------------------------------------
+
+popup_carregar_avatar = function(_pedido) {
+
+    // Avatar recebido diretamente.
+    if (_pedido.avatar_sprite != -1) {
+        return;
+    }
+
+    var _menu = instance_find(obj_menu, 0);
+
+    if (_menu == noone) return;
+
+    // ----------------------------------------------
+    // REAPROVEITAR AVATAR JA CARREGADO
+    // ----------------------------------------------
+
+    for (var _i = 0; _i < array_length(_menu.menu_amigos); _i++) {
+
+        var _amigo = _menu.menu_amigos[_i];
+
+        if (_amigo.steam_id == _pedido.steam_id) {
+
+            if (
+                _amigo.sprite != -1 &&
+                sprite_exists(_amigo.sprite)
+            ) {
+
+                _pedido.avatar_sprite = _amigo.sprite;
+                _pedido.avatar_proprio = false;
+
+                return;
+            }
+        }
+    }
+
+    // ----------------------------------------------
+    // SOLICITAR AVATAR PELA STEAM
+    // ----------------------------------------------
+
+    if (!steam_api_is_initialized()) return;
+
+    if (
+        _pedido.steam_id == 0 ||
+        _pedido.steam_id == ""
+    ) {
+        return;
+    }
+
+    var _imagem =
+        steam_friends_get_large_friend_avatar(
+            _pedido.steam_id
+        );
+
+    if (_imagem <= 0) return;
+
+    var _novo_sprite =
+        _menu.menu_amigos_criar_sprite(_imagem);
+
+    if (_novo_sprite != -1) {
+
+        _pedido.avatar_sprite = _novo_sprite;
+
+        // Este sprite pertence ao popup.
+        _pedido.avatar_proprio = true;
+    }
+};
+
+// --------------------------------------------------
+// LIBERAR AVATAR DE UM PEDIDO
+// --------------------------------------------------
+
+popup_liberar_avatar = function(_pedido) {
+
+    if (_pedido.avatar_proprio) {
+
+        if (
+            _pedido.avatar_sprite != -1 &&
+            sprite_exists(_pedido.avatar_sprite)
+        ) {
+
+            sprite_delete(_pedido.avatar_sprite);
+        }
+
+        _pedido.avatar_sprite = -1;
+        _pedido.avatar_proprio = false;
+    }
+};
+
+// --------------------------------------------------
+// RESPONDER SOLICITACAO
+// --------------------------------------------------
+
+popup_responder = function(_pedido, _aceitou) {
+
+    if (_pedido.resposta_enviada) return;
+
+    _pedido.resposta_enviada = true;
+    _pedido.estado = "saindo";
+
+    // Entrega a resposta ao sistema de amizades,
+    // caso o callback esteja conectado.
+    if (is_callable(popup_ao_responder)) {
+
+        popup_ao_responder(
+            _pedido.pedido_id,
+            _aceitou
+        );
+
+    } else {
+
+        show_debug_message(
+            "[AMIZADE] Pedido: " +
+            string(_pedido.pedido_id) +
+            " | Resposta: " +
+            (_aceitou ? "ACEITAR" : "RECUSAR") +
+            " | Sem callback do servidor"
+        );
+    }
+};
+
+// --------------------------------------------------
+// OBTER A AREA VISIVEL DA CAMERA
+// --------------------------------------------------
+
+// O popup usa Draw normal, nao Draw GUI.
+
+popup_camera_x = 0;
+popup_camera_y = 0;
+
+popup_camera_largura = 1280;
+popup_camera_altura = 720;
+"
+obj_friend_request_popup clean up:"
+/// obj_friend_request_popup - Clean Up
+
+// --------------------------------------------------
+// LIBERAR AVATARES DOS POPUPS ATIVOS
+// --------------------------------------------------
+
+for (
+    var _i = 0;
+    _i < array_length(popup_ativos);
+    _i++
+) {
+
+    popup_liberar_avatar(popup_ativos[_i]);
+}
+
+// --------------------------------------------------
+// LIBERAR AVATARES DA FILA
+// --------------------------------------------------
+
+for (
+    var _i = 0;
+    _i < array_length(popup_fila);
+    _i++
+) {
+
+    popup_liberar_avatar(popup_fila[_i]);
+}
+
+popup_ativos = [];
+popup_fila = [];
+
+popup_ao_responder = undefined;
+"
+obj_friend_request_popup step:"
+/// obj_friend_request_popup - Step
+
+// --------------------------------------------------
+// POSICAO DA CAMERA
+// --------------------------------------------------
+
+popup_camera_x = 0;
+popup_camera_y = 0;
+
+popup_camera_largura = 1280;
+popup_camera_altura = 720;
+
+if (view_enabled && view_visible[0]) {
+
+    var _camera = view_camera[0];
+
+    if (_camera != -1) {
+
+        popup_camera_x = camera_get_view_x(_camera);
+        popup_camera_y = camera_get_view_y(_camera);
+
+        popup_camera_largura =
+            camera_get_view_width(_camera);
+
+        popup_camera_altura =
+            camera_get_view_height(_camera);
+    }
+}
+
+// --------------------------------------------------
+// LIMITES HORIZONTAIS
+// --------------------------------------------------
+
+var _direita =
+    popup_camera_x + popup_camera_largura;
+
+// Ultimos 32 pixels do popup ficam fora da tela.
+var _destino_x =
+    _direita - popup_largura + popup_fora_direita;
+
+// Popup totalmente fora da tela.
+var _fora_x = _direita + 40;
+
+// --------------------------------------------------
+// TESTE DE SOLICITACOES
+// --------------------------------------------------
+
+if (
+    popup_modo_teste &&
+    keyboard_check_pressed(vk_f9)
+) {
+
+    var _menu = instance_find(obj_menu, 0);
+
+    var _nome_teste = "Amigo de teste";
+    var _avatar_teste = -1;
+
+    if (_menu != noone) {
+
+        _nome_teste = _menu.nome_jogador;
+
+        if (_menu.menu_avatar_carregado) {
+            _avatar_teste = _menu.menu_avatar_sprite;
+        }
+    }
+
+    // Cinco pedidos: quatro aparecem e um espera.
+    repeat (5) {
+
+        popup_teste_contador++;
+
+        popup_receber(
+            "teste_" + string(popup_teste_contador),
+            0,
+            _nome_teste + " " + string(popup_teste_contador),
+            _avatar_teste
+        );
+    }
+}
+
+// --------------------------------------------------
+// PROMOVER PEDIDOS DA FILA
+// --------------------------------------------------
+
+for (var _slot = 0; _slot < popup_maximo; _slot++) {
+
+    if (array_length(popup_fila) <= 0) {
+        break;
+    }
+
+    if (popup_slot_ocupado(_slot)) {
+        continue;
+    }
+
+    // Pegar o primeiro pedido da fila.
+    var _pedido = popup_fila[0];
+
+    array_delete(popup_fila, 0, 1);
+
+    _pedido.slot = _slot;
+
+    _pedido.pos_x = _fora_x;
+
+    _pedido.pos_y =
+        popup_camera_y +
+        popup_margem_topo +
+        _slot * (popup_altura + popup_espacamento);
+
+    _pedido.estado = "entrando";
+
+    _pedido.tempo_restante = popup_duracao;
+
+    popup_carregar_avatar(_pedido);
+
+    array_push(popup_ativos, _pedido);
+}
+
+// --------------------------------------------------
+// ATUALIZAR POPUPS ATIVOS
+// --------------------------------------------------
+
+// delta_time usa microssegundos.
+// Convertendo para segundos.
+var _dt = delta_time / 1000000;
+
+for (
+    var _i = array_length(popup_ativos) - 1;
+    _i >= 0;
+    _i--
+) {
+
+    var _pedido = popup_ativos[_i];
+
+    // ----------------------------------------------
+    // ENTRADA ANIMADA
+    // ----------------------------------------------
+
+    if (_pedido.estado == "entrando") {
+
+        _pedido.pos_x = lerp(
+            _pedido.pos_x,
+            _destino_x,
+            popup_velocidade
+        );
+
+        if (abs(_pedido.pos_x - _destino_x) <= 1) {
+
+            _pedido.pos_x = _destino_x;
+
+            // Contagem comeca somente aqui.
+            _pedido.estado = "ativo";
+        }
+    }
+
+    // ----------------------------------------------
+    // POPUP ATIVO
+    // ----------------------------------------------
+
+    else if (_pedido.estado == "ativo") {
+
+        _pedido.tempo_restante -= _dt;
+
+        // ------------------------------------------
+        // TEMPO ESGOTADO: RECUSAR
+        // ------------------------------------------
+
+        if (_pedido.tempo_restante <= 0) {
+
+            _pedido.tempo_restante = 0;
+
+            popup_responder(_pedido, false);
+
+            continue;
+        }
+
+        // ------------------------------------------
+        // CLIQUES NOS BOTOES
+        // ------------------------------------------
+
+        if (mouse_check_button_pressed(mb_left)) {
+
+            // Botao Rejeitar.
+            var _reject_x = _pedido.pos_x + 22;
+            var _reject_y = _pedido.pos_y + 92;
+
+            var _reject_w = 122;
+            var _reject_h = 34;
+
+            // Botao Aceitar.
+            var _accept_x = _pedido.pos_x + 153;
+            var _accept_y = _pedido.pos_y + 92;
+
+            var _accept_w = 122;
+            var _accept_h = 34;
+
+            // --------------------------------------
+            // REJEITAR
+            // --------------------------------------
+
+            if (point_in_rectangle(
+                mouse_x,
+                mouse_y,
+                _reject_x,
+                _reject_y,
+                _reject_x + _reject_w,
+                _reject_y + _reject_h
+            )) {
+
+                popup_responder(_pedido, false);
+
+                continue;
+            }
+
+            // --------------------------------------
+            // ACEITAR
+            // --------------------------------------
+
+            if (point_in_rectangle(
+                mouse_x,
+                mouse_y,
+                _accept_x,
+                _accept_y,
+                _accept_x + _accept_w,
+                _accept_y + _accept_h
+            )) {
+
+                popup_responder(_pedido, true);
+
+                continue;
+            }
+        }
+    }
+
+    // ----------------------------------------------
+    // SAIDA ANIMADA
+    // ----------------------------------------------
+
+    else if (_pedido.estado == "saindo") {
+
+        _pedido.pos_x = lerp(
+            _pedido.pos_x,
+            _fora_x,
+            popup_velocidade
+        );
+
+        // So libera o slot depois que saiu.
+        if (abs(_pedido.pos_x - _fora_x) <= 1) {
+
+            popup_liberar_avatar(_pedido);
+
+            array_delete(popup_ativos, _i, 1);
+
+            continue;
+        }
+    }
+}
+"
+obj_friend_request_popup draw:"
+/// obj_friend_request_popup - Draw
+
+// --------------------------------------------------
+// CONFIGURAR DESENHO
+// --------------------------------------------------
+
+draw_set_alpha(1);
+draw_set_color(c_white);
+
+draw_set_font(fnt_pixelari);
+draw_set_halign(fa_left);
+draw_set_valign(fa_top);
+
+// --------------------------------------------------
+// DESENHAR TODOS OS POPUPS
+// --------------------------------------------------
+
+for (
+    var _i = 0;
+    _i < array_length(popup_ativos);
+    _i++
+) {
+
+    var _pedido = popup_ativos[_i];
+
+    var _px = _pedido.pos_x;
+    var _py = _pedido.pos_y;
+
+    // ----------------------------------------------
+    // FUNDO DO POPUP
+    // ----------------------------------------------
+
+    var _fundo_sx =
+        popup_largura /
+        max(1, sprite_get_width(spr_mini_popup));
+
+    var _fundo_sy =
+        popup_altura /
+        max(1, sprite_get_height(spr_mini_popup));
+
+    draw_set_color(c_white);
+
+    draw_sprite_ext(
+        spr_mini_popup,
+        0,
+        _px,
+        _py,
+        _fundo_sx,
+        _fundo_sy,
+        0,
+        c_white,
+        1
+    );
+
+    // ----------------------------------------------
+    // FOTO DO JOGADOR
+    // ----------------------------------------------
+
+    var _foto_x = _px + 22;
+    var _foto_y = _py + 21;
+
+    var _foto_tamanho = 58;
+
+    // Fundo para quando avatar nao estiver carregado.
+    draw_set_color(c_black);
+
+    draw_rectangle(
+        _foto_x,
+        _foto_y,
+        _foto_x + _foto_tamanho,
+        _foto_y + _foto_tamanho,
+        false
+    );
+
+    draw_set_color(c_white);
+
+    // Avatar Steam.
+    if (
+        _pedido.avatar_sprite != -1 &&
+        sprite_exists(_pedido.avatar_sprite)
+    ) {
+
+        var _avatar_w =
+            sprite_get_width(_pedido.avatar_sprite);
+
+        var _avatar_h =
+            sprite_get_height(_pedido.avatar_sprite);
+
+        gpu_set_texfilter(true);
+
+        draw_sprite_ext(
+            _pedido.avatar_sprite,
+            0,
+            _foto_x,
+            _foto_y,
+            _foto_tamanho / max(1, _avatar_w),
+            _foto_tamanho / max(1, _avatar_h),
+            0,
+            c_white,
+            1
+        );
+
+        gpu_set_texfilter(false);
+    }
+
+    // ----------------------------------------------
+    // MOLDURA DA FOTO
+    // ----------------------------------------------
+
+    draw_sprite_ext(
+        spr_moldura,
+        0,
+        _foto_x,
+        _foto_y,
+        60 / max(1, sprite_get_width(spr_moldura)),
+        60 / max(1, sprite_get_height(spr_moldura)),
+        0,
+        c_white,
+        1
+    );
+
+    // ----------------------------------------------
+    // NOME DO JOGADOR
+    // ----------------------------------------------
+
+    draw_set_font(fnt_pixelari);
+    draw_set_color(c_white);
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+
+    var _nome_exibido =
+        string_copy(_pedido.nome, 1, 18);
+
+    draw_text_transformed(
+        _px + 110,
+        _py + 21,
+        _nome_exibido,
+        0.115,
+        0.115,
+        0
+    );
+
+    // ----------------------------------------------
+    // MENSAGEM DO PEDIDO
+    // ----------------------------------------------
+
+    draw_text_transformed(
+        _px + 100,
+        _py + 50,
+        "Esta te enviando um\npedido de amizade",
+        0.09,
+        0.09,
+        0
+    );
+
+    // ----------------------------------------------
+    // BOTOES DE REJEITAR E ACEITAR
+    // ----------------------------------------------
+
+    var _reject_x = _px + 22;
+    var _reject_y = _py + 92;
+
+    var _accept_x = _px + 153;
+    var _accept_y = _py + 92;
+
+    var _botao_w = 122;
+    var _botao_h = 34;
+
+    var _botao_sx =
+        _botao_w /
+        max(1, sprite_get_width(spr_button_accept_and_reject));
+
+    var _botao_sy =
+        _botao_h /
+        max(1, sprite_get_height(spr_button_accept_and_reject));
+
+    // ----------------------------------------------
+    // HOVER: APENAS SE AINDA ESTA ATIVO
+    // ----------------------------------------------
+
+    var _interativo = (_pedido.estado == "ativo");
+
+    var _hover_reject = (
+        _interativo &&
+        point_in_rectangle(
+            mouse_x,
+            mouse_y,
+            _reject_x,
+            _reject_y,
+            _reject_x + _botao_w,
+            _reject_y + _botao_h
+        )
+    );
+
+    var _hover_accept = (
+        _interativo &&
+        point_in_rectangle(
+            mouse_x,
+            mouse_y,
+            _accept_x,
+            _accept_y,
+            _accept_x + _botao_w,
+            _accept_y + _botao_h
+        )
+    );
+
+    // ----------------------------------------------
+    // REJEITAR
+    // Index 0 normal
+    // Index 1 hover
+    // ----------------------------------------------
+
+    draw_sprite_ext(
+        spr_button_accept_and_reject,
+        _hover_reject ? 1 : 0,
+        _reject_x,
+        _reject_y,
+        _botao_sx,
+        _botao_sy,
+        0,
+        c_white,
+        1
+    );
+
+    // ----------------------------------------------
+    // ACEITAR
+    // Index 2 normal
+    // Index 3 hover
+    // ----------------------------------------------
+
+    draw_sprite_ext(
+        spr_button_accept_and_reject,
+        _hover_accept ? 3 : 2,
+        _accept_x,
+        _accept_y,
+        _botao_sx,
+        _botao_sy,
+        0,
+        c_white,
+        1
+    );
+
+    // --------------------------------------------------
+    // TIMER DE 10 SEGUNDOS
+    // --------------------------------------------------
+
+    var _timer_x = _px + 14;
+    var _timer_y = _py + 140;
+
+    var _timer_w = 282;
+    var _timer_h = 10;
+
+    var _progresso = clamp(
+        _pedido.tempo_restante / popup_duracao,
+        0,
+        1
+    );
+
+    // Fundo da barra.
+    draw_set_color(c_black);
+
+    draw_rectangle(
+        _timer_x,
+        _timer_y,
+        _timer_x + _timer_w,
+        _timer_y + _timer_h,
+        false
+    );
+
+    // Preenchimento:
+    // com o tempo, a borda esquerda avanca
+    // em direcao a direita.
+    var _largura_restante =
+        (_timer_w - 4) * _progresso;
+
+    draw_set_color(c_white);
+
+    if (_largura_restante > 0) {
+
+        draw_rectangle(
+            _timer_x + _timer_w - 2 - _largura_restante,
+            _timer_y + 2,
+            _timer_x + _timer_w - 2,
+            _timer_y + _timer_h - 2,
+            false
+        );
+    }
+}
+
+// --------------------------------------------------
+// RESTAURAR ESTADO DO DESENHO
+// --------------------------------------------------
+
+draw_set_alpha(1);
+draw_set_color(c_white);
+draw_set_halign(fa_left);
+draw_set_valign(fa_top);
+draw_set_font(-1);
+"
